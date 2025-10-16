@@ -8,6 +8,10 @@ dependencies = [
   "pandas",
   "ipykernel",
   "jupyter",
+  "flask",
+  "matplotlib",
+  "scipy",
+  "pyarrow",
 ]
 
 [tool.uv]

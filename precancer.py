@@ -1,16 +1,21 @@
-from flask import Flask, render_template, request, jsonify
-import pandas as pd
-import matplotlib.pyplot as plt
-import io
 import base64
-import numpy as np
-from scipy.stats import ttest_ind
+import io
+import os
+from pathlib import Path
 
 import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from flask import Flask, jsonify, render_template, request
+from scipy.stats import ttest_ind
 
 matplotlib.use("Agg")
 
 app = Flask(__name__)
+DATA_DIR = Path(os.getenv("DATA_DIR", "data")).expanduser()
+COUNT_PATH = DATA_DIR / "count_data.parquet"
+ANNO_PATH = DATA_DIR / "anno_data.parquet"
 
 
 @app.route("/")
@@ -23,7 +28,18 @@ def plot():
     gene = request.form["gene"].strip()
 
     # Load the count data and set index to "Gene"
-    count_data = pd.read_parquet("./data/count_data.parquet").set_index("Gene")
+    try:
+        count_data = pd.read_parquet(COUNT_PATH).set_index("Gene")
+    except FileNotFoundError:
+        return (
+            jsonify(
+                error=(
+                    "Count data file not found. "
+                    "Set DATA_DIR to the directory containing count_data.parquet."
+                )
+            ),
+            500,
+        )
 
     # Check if the gene exists
     if gene not in count_data.index:
@@ -35,21 +51,32 @@ def plot():
     gene_data.columns = ["Sample", "Count"]
 
     # Load annotation data and apply renaming and filtering
-    anno_data = pd.read_parquet(
-        "./data/anno_data.parquet",
-        columns=[
-            "type",
-            "Age",
-            "SegmentDisplayName",
-            "Diagnosis_ralph",
-            "Ki67 percentage",
-            "p53 pattern",
-            "Morphology category",
-            "BRCA category",
-            "Molecular_Subtype",
-            "Decision Tree",
-        ],
-    )
+    try:
+        anno_data = pd.read_parquet(
+            ANNO_PATH,
+            columns=[
+                "type",
+                "Age",
+                "SegmentDisplayName",
+                "Diagnosis_ralph",
+                "Ki67 percentage",
+                "p53 pattern",
+                "Morphology category",
+                "BRCA category",
+                "Molecular_Subtype",
+                "Decision Tree",
+            ],
+        )
+    except FileNotFoundError:
+        return (
+            jsonify(
+                error=(
+                    "Annotation data file not found. "
+                    "Set DATA_DIR to the directory containing anno_data.parquet."
+                )
+            ),
+            500,
+        )
     rename_dict = {
         "Normal fallopian tube epithelium": "NFT",
         "p53 signature": "p53 sig",
@@ -187,10 +214,11 @@ def plot():
         img2.seek(0)
         plot_url2 = base64.b64encode(img2.getvalue()).decode()
         plt.close(fig2)
-    return jsonify(
-        plot_url1=f"data:image/png;base64,{plot_url1}",
-        plot_url2=f"data:image/png;base64,{plot_url2}",
+    response = {"plot_url1": f"data:image/png;base64,{plot_url1}"}
+    response["plot_url2"] = (
+        f"data:image/png;base64,{plot_url2}" if plot_url2 is not None else None
     )
+    return jsonify(response)
 
 
 if __name__ == "__main__":
