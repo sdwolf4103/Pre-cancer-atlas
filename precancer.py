@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -33,12 +34,15 @@ def _drive_client():
 
 
 def _ensure_local(path: Path, file_id: str):
-    if path.exists():
+    if path.exists() and path.stat().st_size > 0:
         return path
-    if not file_id:
+    if path.exists():
+        path.unlink()
+    normalized_id = _normalize_file_id(file_id)
+    if not normalized_id:
         raise RuntimeError(f"File identifier for {path.name} is not configured.")
     service = _drive_client()
-    request = service.files().get_media(fileId=file_id)
+    request = service.files().get_media(fileId=normalized_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as fh:
         downloader = MediaIoBaseDownload(fh, request)
@@ -46,6 +50,29 @@ def _ensure_local(path: Path, file_id: str):
         while not done:
             _, done = downloader.next_chunk()
     return path
+
+
+def _normalize_file_id(file_ref: str | None) -> str:
+    if not file_ref:
+        return ""
+    value = file_ref.strip()
+    if "://" not in value:
+        return value
+    parsed = urlparse(value)
+    if parsed.netloc.endswith("drive.google.com"):
+        if "/file/d/" in parsed.path:
+            segments = parsed.path.split("/")
+            try:
+                idx = segments.index("d")
+                return segments[idx + 1]
+            except (ValueError, IndexError):
+                pass
+        query = parse_qs(parsed.query)
+        if "id" in query:
+            return query["id"][0]
+    raise RuntimeError(
+        "GOOGLE Drive file reference must be a file ID or share link with an embedded ID."
+    )
 
 
 def _load_service_account_info() -> dict:
