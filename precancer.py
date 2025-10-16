@@ -1,7 +1,9 @@
 import base64
 import io
 import json
+import logging
 import os
+import threading
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -21,10 +23,14 @@ app = Flask(__name__)
 DATA_DIR = Path(os.getenv("DATA_DIR", "data")).expanduser()
 COUNT_PATH = DATA_DIR / "count_data.parquet"
 ANNO_PATH = DATA_DIR / "anno_data.parquet"
+MPLCONFIG_DIR = Path(os.getenv("MPLCONFIGDIR", DATA_DIR / ".mpl-cache")).expanduser()
+os.environ.setdefault("MPLCONFIGDIR", str(MPLCONFIG_DIR))
+MPLCONFIG_DIR.mkdir(parents=True, exist_ok=True)
 COUNT_FILE_ID = os.getenv("COUNT_FILE_ID")
 ANNO_FILE_ID = os.getenv("ANNO_FILE_ID")
 SA_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+logger = logging.getLogger(__name__)
 
 
 def _drive_client():
@@ -73,6 +79,31 @@ def _normalize_file_id(file_ref: str | None) -> str:
     raise RuntimeError(
         "GOOGLE Drive file reference must be a file ID or share link with an embedded ID."
     )
+
+
+def _warm_matplotlib():
+    fig, ax = plt.subplots()
+    ax.plot([0], [0])
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    plt.close(fig)
+
+
+def _warm_resources():
+    try:
+        if COUNT_FILE_ID:
+            _ensure_local(COUNT_PATH, COUNT_FILE_ID)
+        if ANNO_FILE_ID:
+            _ensure_local(ANNO_PATH, ANNO_FILE_ID)
+    except Exception as exc:
+        logger.warning("Unable to prefetch data: %s", exc)
+    try:
+        _warm_matplotlib()
+    except Exception as exc:
+        logger.warning("Unable to warm matplotlib cache: %s", exc)
+
+
+threading.Thread(target=_warm_resources, name="warm-resources", daemon=True).start()
 
 
 def _load_service_account_info() -> dict:
