@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -10,12 +11,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from flask import Flask, jsonify, render_template, request
-from werkzeug.exceptions import HTTPException
+import pyarrow as pa
+import pyarrow.compute as pc
+import pyarrow.parquet as pq
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from scipy.stats import ttest_ind
+from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import HTTPException
 
 matplotlib.use("Agg")
 
@@ -131,6 +135,72 @@ def _handle_exception(error):
     return jsonify(error="Internal server error"), 500
 
 
+def _read_gene_row(gene: str) -> pd.DataFrame:
+    pf = pq.ParquetFile(COUNT_PATH)
+    gene_scalar = pa.scalar(gene)
+    for rg in range(pf.num_row_groups):
+        gene_only = pf.read_row_group(rg, columns=["Gene"])
+        mask = pc.equal(gene_only.column("Gene"), gene_scalar)
+        if pc.any(mask).as_py():
+            full = pf.read_row_group(rg)
+            filtered = full.filter(pc.equal(full.column("Gene"), gene_scalar))
+            return filtered.to_pandas()
+    return pd.DataFrame()
+
+
+@lru_cache(maxsize=1)
+def _load_annotation_base() -> pd.DataFrame:
+    _ensure_local(ANNO_PATH, ANNO_FILE_ID)
+    df = pd.read_parquet(
+        ANNO_PATH,
+        columns=[
+            "type",
+            "Age",
+            "SegmentDisplayName",
+            "Diagnosis_ralph",
+            "Ki67 percentage",
+            "p53 pattern",
+            "Morphology category",
+            "BRCA category",
+            "Molecular_Subtype",
+            "Decision Tree",
+        ],
+    )
+    rename_dict = {
+        "Normal fallopian tube epithelium": "NFT",
+        "p53 signature": "p53 sig",
+        "STIC (incidental)": "STIC",
+        "STIC-like lesion": "STICL",
+        "High grade serous carcinoma": "HGSC",
+    }
+    df["Diagnosis"] = df["Diagnosis_ralph"].replace(rename_dict)
+    relevant_diagnoses = ["NFT", "p53 sig", "STIL", "STIC", "STICL", "HGSC"]
+    df = df[df["Diagnosis"].isin(relevant_diagnoses)]
+    df["Diagnosis"] = pd.Categorical(
+        df["Diagnosis"], categories=relevant_diagnoses, ordered=True
+    )
+    df["Molecular_Subtype"] = pd.Categorical(
+        df["Molecular_Subtype"],
+        categories=[
+            "NFT",
+            "Dormant",
+            "Mixed",
+            "Immunoreactive",
+            "Proliferative",
+            "HGSC",
+        ],
+        ordered=True,
+    )
+    return df
+
+
+def _prepare_annotation(sel_type: str | None) -> pd.DataFrame:
+    data = _load_annotation_base()
+    if sel_type:
+        data = data[data["type"] == sel_type]
+    return data
+
+
 @app.route("/")
 def home():
     return render_template("pre_cancer_atlas.html")
@@ -140,10 +210,10 @@ def home():
 def plot():
     gene = request.form["gene"].strip()
 
-    # Load the count data and set index to "Gene"
+    # Load the count data for the specific gene
     try:
         _ensure_local(COUNT_PATH, COUNT_FILE_ID)
-        count_data = pd.read_parquet(COUNT_PATH).set_index("Gene")
+        gene_row = _read_gene_row(gene)
     except FileNotFoundError:
         return (
             jsonify(
@@ -161,32 +231,19 @@ def plot():
         )
 
     # Check if the gene exists
-    if gene not in count_data.index:
+    if gene_row.empty:
         return jsonify(error=f"The gene '{gene}' is not in the database."), 404
 
     # Select data for the chosen gene across all samples
-    gene_data = count_data.loc[gene].to_frame(name="Count")
+    gene_row = gene_row.set_index("Gene")
+    gene_data = gene_row.loc[gene].to_frame(name="Count")
     gene_data.reset_index(inplace=True)
     gene_data.columns = ["Sample", "Count"]
 
     # Load annotation data and apply renaming and filtering
+    sel_type = request.form.get("type")
     try:
-        _ensure_local(ANNO_PATH, ANNO_FILE_ID)
-        anno_data = pd.read_parquet(
-            ANNO_PATH,
-            columns=[
-                "type",
-                "Age",
-                "SegmentDisplayName",
-                "Diagnosis_ralph",
-                "Ki67 percentage",
-                "p53 pattern",
-                "Morphology category",
-                "BRCA category",
-                "Molecular_Subtype",
-                "Decision Tree",
-            ],
-        )
+        anno_data = _prepare_annotation(sel_type)
     except FileNotFoundError:
         return (
             jsonify(
@@ -202,24 +259,9 @@ def plot():
             jsonify(error=f"Unable to load annotation data: {exc}"),
             500,
         )
-    rename_dict = {
-        "Normal fallopian tube epithelium": "NFT",
-        "p53 signature": "p53 sig",
-        "STIC (incidental)": "STIC",
-        "STIC-like lesion": "STICL",
-        "High grade serous carcinoma": "HGSC",
-    }
-    anno_data["Diagnosis"] = anno_data["Diagnosis_ralph"].replace(rename_dict)
-    relevant_diagnoses = ["NFT", "p53 sig", "STIL", "STIC", "STICL", "HGSC"]
-    anno_data = anno_data[anno_data["Diagnosis"].isin(relevant_diagnoses)]
-    anno_data["Diagnosis"] = pd.Categorical(
-        anno_data["Diagnosis"], categories=relevant_diagnoses, ordered=True
-    )
 
     # Select type
-    sel_type = request.form.get("type", None)
-    if sel_type:
-        anno_data = anno_data[anno_data["type"] == sel_type]
+    sel_type = sel_type or None
 
     # Merge with gene data on 'Sample'
     merged_data = pd.merge(
