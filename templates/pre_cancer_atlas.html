@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gene Count Boxplot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='index_styles.css') }}"> <!-- Link to the external CSS file -->
+</head>
+<body>
+    <h1>Pre-cancer Atlass</h1>
+    <p>Please enter a gene name and select a category if desired:</p>
+    <form id="plotForm" onsubmit="generatePlot(); return false;">
+        <label for="type">Select Type:</label>
+        <select name="type" id="type">
+            <option value="epithelium">Epithelium</option>
+            <option value="stroma">Stroma</option>
+        </select>   
+
+        <label for="gene">Enter Gene:</label>
+        <input type="text" id="gene" name="gene" placeholder="Enter gene name" required>   
+
+        <label for="selection">Select Category:</label>
+        <select name="selection" id="selection">
+            <option value="">None</option>
+            <option value="p53 pattern">p53 pattern</option>
+            <option value="Decision Tree">Path</option>
+            <option value="Diagnosis">Pathologic diagnosis</option>
+            <option value="Morphology category">Morphology category</option>
+            <option value="BRCA category">BRCA category</option>
+        </select>
+
+        <button type="submit">Generate Plot</button>
+    </form>
+
+    <div id="plot"></div>
+    <div id="additionalPlot"></div>
+    <div id="error" style="color: red;"></div>
+
+    <script>
+        function generatePlot() {
+          const form     = document.getElementById("plotForm");
+          const formData = new FormData(form);
+          const selCat   = formData.get("selection"); // second dropdown
+          const selType  = (formData.get("type") || "").toLowerCase(); // first dropdown
+      
+          fetch("/pre_cancer_atlas", {
+            method: "POST",
+            body: formData
+          })
+          .then(res => {
+            if (!res.ok) {
+              return res.json().then(j => { throw new Error(j.error); });
+            }
+            return res.json();
+          })
+          .then(data => {
+            // Always show first plot
+            document.getElementById("plot").innerHTML =
+              `<img src="${data.plot_url1}" alt="Boxplot of Gene Count">`;
+      
+            // Now handle the second plot
+            const secondDiv = document.getElementById("additionalPlot");
+            secondDiv.innerHTML = "";
+      
+            // Only show second plot if:
+            //  - user selected a category (selCat not blank)
+            //  - AND user did NOT pick "stroma" as the type
+            //  - AND backend actually returned a valid data-URL
+            if (
+              selCat && 
+              selType !== "stroma" && 
+              typeof data.plot_url2 === "string" && 
+              data.plot_url2.startsWith("data:image")
+            ) {
+              secondDiv.innerHTML =
+                `<img src="${data.plot_url2}" alt="Boxplot of ${selCat}">`;
+            }
+      
+            // Clear any error
+            document.getElementById("error").innerText = "";
+          })
+          .catch(err => {
+            document.getElementById("plot").innerHTML          = "";
+            document.getElementById("additionalPlot").innerHTML = "";
+            document.getElementById("error").innerText         = err.message;
+          });
+        }
+      </script>
+</body>
+</html>

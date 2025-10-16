@@ -1,0 +1,41 @@
+body {
+    font-family: Arial, sans-serif; /* Apply the same font-family as used in the Nanostring page */
+    padding: 20px; /* Add padding for better spacing */
+}
+
+h1 {
+    margin-bottom: 20px; /* Add spacing below the heading */
+}
+
+form {
+    margin-bottom: 20px; /* Add spacing below the form */
+}
+
+label {
+    font-weight: bold; /* Make labels bold */
+}
+
+input[type="text"] {
+    padding: 8px; /* Add padding to the text input */
+    border-radius: 4px; /* Add rounded corners */
+    border: 1px solid #ccc; /* Add a border */
+}
+
+button[type="submit"] {
+    padding: 8px 16px; /* Add padding to the button */
+    border: none; /* Remove default button border */
+    background-color: #868f9b; /* Set button background color */
+    color: #fff; /* Set button text color */
+    border-radius: 4px; /* Add rounded corners */
+    cursor: pointer; /* Change cursor to pointer on hover */
+}
+
+button[type="submit"]:hover {
+    background-color: #50565c; /* Change button background color on hover */
+}
+
+a {
+    text-decoration: none; /* Remove underline from links */
+    color: #007bff; /* Set link color */
+    margin-right: 10px; /* Add spacing to the right of the link */
+}

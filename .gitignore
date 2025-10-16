@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+uv.lock
+.env
+*.egg-info/
+__pypackages__/
+
+# OS
+.DS_Store
+
+# IDE / Editors
+.vscode/
+*.code-workspace
+.idea/
+
+# Data (never commit)
+data/*.parquet
+data/**/*.parquet
+
+# Logs / temp
+*.log
+*.tmp
