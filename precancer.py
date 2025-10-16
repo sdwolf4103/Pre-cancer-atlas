@@ -23,9 +23,7 @@ def plot():
     gene = request.form["gene"].strip()
 
     # Load the count data and set index to "Gene"
-    count_data = pd.read_parquet(
-        "/Users/sd_wo/Library/CloudStorage/OneDrive-JohnsHopkins/projects/nanostring/share/Nanostring/Data/count_data.parquet"
-    ).set_index("Gene")
+    count_data = pd.read_parquet("./data/count_data.parquet").set_index("Gene")
 
     # Check if the gene exists
     if gene not in count_data.index:
@@ -38,7 +36,7 @@ def plot():
 
     # Load annotation data and apply renaming and filtering
     anno_data = pd.read_parquet(
-        "/Users/sd_wo/Library/CloudStorage/OneDrive-JohnsHopkins/projects/nanostring/share/Nanostring/Data/anno_data.parquet",
+        "./data/anno_data.parquet",
         columns=[
             "type",
             "Age",

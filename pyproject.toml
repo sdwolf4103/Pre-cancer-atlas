@@ -1,0 +1,15 @@
+[project]
+name = "pre-cacner-atlas"
+version = "0.1.0"
+description = "uv-only project scaffold"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "pandas",
+  "ipykernel",
+  "jupyter",
+]
+
+[tool.uv]
+# 如需釘定 python 版本，取消下一行註解
+# python = "3.11"
