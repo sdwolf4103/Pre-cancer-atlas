@@ -81,14 +81,6 @@ def _normalize_file_id(file_ref: str | None) -> str:
     )
 
 
-def _warm_matplotlib():
-    fig, ax = plt.subplots()
-    ax.plot([0], [0])
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png")
-    plt.close(fig)
-
-
 def _warm_resources():
     try:
         if COUNT_FILE_ID:
@@ -97,10 +89,15 @@ def _warm_resources():
             _ensure_local(ANNO_PATH, ANNO_FILE_ID)
     except Exception as exc:
         logger.warning("Unable to prefetch data: %s", exc)
-    try:
-        _warm_matplotlib()
-    except Exception as exc:
-        logger.warning("Unable to warm matplotlib cache: %s", exc)
+    if os.getenv("WARM_MPL", "1") != "0":
+        try:
+            fig, ax = plt.subplots()
+            ax.plot([0], [0])
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png")
+            plt.close(fig)
+        except Exception as exc:
+            logger.warning("Unable to warm matplotlib cache: %s", exc)
 
 
 if os.getenv("PRELOAD_DATA", "1") != "0":
