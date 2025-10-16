@@ -13,6 +13,8 @@ dependencies = [
   "scipy",
   "pyarrow",
   "gunicorn",
+  "google-api-python-client",
+  "google-auth",
 ]
 
 [tool.uv]

@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 from pathlib import Path
 
@@ -8,6 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 from scipy.stats import ttest_ind
 
 matplotlib.use("Agg")
@@ -16,6 +20,48 @@ app = Flask(__name__)
 DATA_DIR = Path(os.getenv("DATA_DIR", "data")).expanduser()
 COUNT_PATH = DATA_DIR / "count_data.parquet"
 ANNO_PATH = DATA_DIR / "anno_data.parquet"
+COUNT_FILE_ID = os.getenv("COUNT_FILE_ID")
+ANNO_FILE_ID = os.getenv("ANNO_FILE_ID")
+SA_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
+
+def _drive_client():
+    info = _load_service_account_info()
+    creds = service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+    return build("drive", "v3", credentials=creds)
+
+
+def _ensure_local(path: Path, file_id: str):
+    if path.exists():
+        return path
+    if not file_id:
+        raise RuntimeError(f"File identifier for {path.name} is not configured.")
+    service = _drive_client()
+    request = service.files().get_media(fileId=file_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as fh:
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+    return path
+
+
+def _load_service_account_info() -> dict:
+    if not SA_JSON:
+        raise RuntimeError(
+            "GOOGLE_SERVICE_ACCOUNT_JSON is not configured for Drive access."
+        )
+    raw = SA_JSON.strip()
+    if raw.startswith("{"):
+        return json.loads(raw)
+    candidate = Path(raw).expanduser()
+    if not candidate.exists():
+        raise RuntimeError(
+            "GOOGLE_SERVICE_ACCOUNT_JSON must be a JSON string or path to the credential file."
+        )
+    return json.loads(candidate.read_text())
 
 
 @app.route("/")
@@ -29,6 +75,7 @@ def plot():
 
     # Load the count data and set index to "Gene"
     try:
+        _ensure_local(COUNT_PATH, COUNT_FILE_ID)
         count_data = pd.read_parquet(COUNT_PATH).set_index("Gene")
     except FileNotFoundError:
         return (
@@ -38,6 +85,11 @@ def plot():
                     "Set DATA_DIR to the directory containing count_data.parquet."
                 )
             ),
+            500,
+        )
+    except Exception as exc:
+        return (
+            jsonify(error=f"Unable to load count data: {exc}"),
             500,
         )
 
@@ -52,6 +104,7 @@ def plot():
 
     # Load annotation data and apply renaming and filtering
     try:
+        _ensure_local(ANNO_PATH, ANNO_FILE_ID)
         anno_data = pd.read_parquet(
             ANNO_PATH,
             columns=[
@@ -75,6 +128,11 @@ def plot():
                     "Set DATA_DIR to the directory containing anno_data.parquet."
                 )
             ),
+            500,
+        )
+    except Exception as exc:
+        return (
+            jsonify(error=f"Unable to load annotation data: {exc}"),
             500,
         )
     rename_dict = {
