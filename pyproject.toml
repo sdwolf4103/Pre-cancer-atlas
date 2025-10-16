@@ -12,6 +12,7 @@ dependencies = [
   "matplotlib",
   "scipy",
   "pyarrow",
+  "gunicorn",
 ]
 
 [tool.uv]
