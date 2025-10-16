@@ -3,7 +3,6 @@ import io
 import json
 import logging
 import os
-import threading
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -12,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -103,7 +103,11 @@ def _warm_resources():
         logger.warning("Unable to warm matplotlib cache: %s", exc)
 
 
-threading.Thread(target=_warm_resources, name="warm-resources", daemon=True).start()
+if os.getenv("PRELOAD_DATA", "1") != "0":
+    try:
+        _warm_resources()
+    except Exception as exc:
+        logger.warning("Warm-up failed: %s", exc)
 
 
 def _load_service_account_info() -> dict:
@@ -120,6 +124,14 @@ def _load_service_account_info() -> dict:
             "GOOGLE_SERVICE_ACCOUNT_JSON must be a JSON string or path to the credential file."
         )
     return json.loads(candidate.read_text())
+
+
+@app.errorhandler(Exception)
+def _handle_exception(error):
+    if isinstance(error, HTTPException):
+        return error
+    logger.exception("Unhandled error")
+    return jsonify(error="Internal server error"), 500
 
 
 @app.route("/")
