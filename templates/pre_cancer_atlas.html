@@ -22,7 +22,6 @@
             <option value="">None</option>
             <option value="p53 pattern">p53 pattern</option>
             <option value="Decision Tree">Path</option>
-            <option value="Diagnosis">Pathologic diagnosis</option>
             <option value="Morphology category">Morphology category</option>
             <option value="BRCA category">BRCA category</option>
         </select>
@@ -32,14 +31,19 @@
 
     <div id="plot"></div>
     <div id="additionalPlot"></div>
+    <div id="selectionPlot"></div>
     <div id="error" style="color: red;"></div>
 
     <script>
         function generatePlot() {
-          const form     = document.getElementById("plotForm");
+          const form      = document.getElementById("plotForm");
+          const geneInput = document.getElementById("gene");
+          const geneValue = (geneInput.value || "").trim().toUpperCase();
+          geneInput.value = geneValue;
+
           const formData = new FormData(form);
-          const selCat   = formData.get("selection"); // second dropdown
-          const selType  = (formData.get("type") || "").toLowerCase(); // first dropdown
+          const selCat   = formData.get("selection") || "";
+          formData.set("gene", geneValue);
       
           fetch("/pre_cancer_atlas", {
             method: "POST",
@@ -58,22 +62,24 @@
       
             // Now handle the second plot
             const secondDiv = document.getElementById("additionalPlot");
+            const thirdDiv  = document.getElementById("selectionPlot");
             secondDiv.innerHTML = "";
-      
-            // Only show second plot if:
-            //  - user selected a category (selCat not blank)
-            //  - AND user did NOT pick "stroma" as the type
-            //  - AND backend actually returned a valid data-URL
-            if (
-              selCat && 
-              selType !== "stroma" && 
-              typeof data.plot_url2 === "string" && 
-              data.plot_url2.startsWith("data:image")
-            ) {
+            thirdDiv.innerHTML  = "";
+
+            if (typeof data.plot_url2 === "string" && data.plot_url2.startsWith("data:image")) {
               secondDiv.innerHTML =
-                `<img src="${data.plot_url2}" alt="Boxplot of ${selCat}">`;
+                `<img src="${data.plot_url2}" alt="Boxplot of Pathologic Diagnosis">`;
             }
-      
+
+            if (
+              typeof data.plot_url3 === "string" &&
+              data.plot_url3.startsWith("data:image")
+            ) {
+              const label = selCat ? selCat : "Selected category";
+              thirdDiv.innerHTML =
+                `<img src="${data.plot_url3}" alt="Boxplot of ${label}">`;
+            }
+
             // Clear any error
             document.getElementById("error").innerText = "";
           })

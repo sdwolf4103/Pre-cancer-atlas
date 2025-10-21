@@ -208,7 +208,7 @@ def home():
 
 @app.route("/pre_cancer_atlas", methods=["POST"])
 def plot():
-    gene = request.form["gene"].strip()
+    gene = request.form["gene"].strip().upper()
 
     # Load the count data for the specific gene
     try:
@@ -239,6 +239,8 @@ def plot():
     gene_data = gene_row.loc[gene].to_frame(name="Count")
     gene_data.reset_index(inplace=True)
     gene_data.columns = ["Sample", "Count"]
+
+    selection = request.form.get("selection", "").strip()
 
     # Load annotation data and apply renaming and filtering
     sel_type = request.form.get("type")
@@ -307,7 +309,7 @@ def plot():
     ]
     category_positions = {cat: idx + 1 for idx, cat in enumerate(present_categories)}
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 5))
     plot_data.boxplot(
         column="Count",
         by="Molecular_Subtype",
@@ -378,50 +380,150 @@ def plot():
     plot_url1 = base64.b64encode(img.getvalue()).decode()
     plt.close(fig)
 
-    ####Second plot
-    selection = request.form.get("selection", None)
-    plot_url2 = None
-    if selection and sel_type != "stroma":
-        # Merge and drop missing
-        plot_data = pd.merge(
+    ####Second plot: Pathologic diagnosis
+    diagnosis_categories = [
+        "Stroma",
+        "NFT",
+        "p53 sig",
+        "STIL",
+        "STIC",
+        "HGSC",
+    ]
+
+    diagnosis_data = plot_data.copy()
+    diagnosis_data["Diagnosis"] = diagnosis_data["Diagnosis"].astype("object")
+    diagnosis_data.loc[diagnosis_data["Molecular_Subtype"] == "Stroma", "Diagnosis"] = (
+        "Stroma"
+    )
+    diagnosis_data["Diagnosis_Grouped"] = diagnosis_data["Diagnosis"].replace(
+        {"STICL": "STIC"}
+    )
+    diagnosis_data["Diagnosis_Grouped"] = pd.Categorical(
+        diagnosis_data["Diagnosis_Grouped"],
+        categories=diagnosis_categories,
+        ordered=True,
+    )
+    diagnosis_data = diagnosis_data.dropna(subset=["Diagnosis_Grouped"])
+
+    fig2, ax2 = plt.subplots(figsize=(8, 5))
+    diagnosis_data.boxplot(
+        column="Count",
+        by="Diagnosis_Grouped",
+        ax=ax2,
+        flierprops={"marker": ""},
+    )
+
+    diag_present = [
+        cat
+        for cat in diagnosis_categories
+        if (diagnosis_data["Diagnosis_Grouped"] == cat).any()
+    ]
+    diag_positions = {cat: idx + 1 for idx, cat in enumerate(diag_present)}
+
+    for subtype in diag_present:
+        mask = diagnosis_data["Diagnosis_Grouped"] == subtype
+        x = np.random.normal(diag_positions[subtype], jitter_strength, size=mask.sum())
+        y = diagnosis_data.loc[mask, "Count"]
+        ax2.scatter(x, y, color="black", alpha=0.7, s=point_size)
+
+    nft_diag_counts = diagnosis_data.loc[
+        diagnosis_data["Diagnosis_Grouped"] == "NFT", "Count"
+    ]
+    if len(nft_diag_counts) >= 2:
+        for subtype in diag_present:
+            if subtype in {"NFT", "Stroma"}:
+                continue
+            subtype_counts = diagnosis_data.loc[
+                diagnosis_data["Diagnosis_Grouped"] == subtype, "Count"
+            ]
+            if len(subtype_counts) < 2:
+                continue
+            _, p_value = ttest_ind(nft_diag_counts, subtype_counts, equal_var=False)
+            marker = None
+            if p_value < 0.001:
+                marker = "***"
+            elif p_value < 0.01:
+                marker = "**"
+            elif p_value < 0.05:
+                marker = "*"
+            if marker:
+                y_max = diagnosis_data["Count"].max()
+                y_min = diagnosis_data["Count"].min()
+                padding = max((y_max - y_min) * 0.1, 0.1 * max(abs(y_max), 1))
+                ax2.text(
+                    diag_positions[subtype],
+                    y_max + padding * 0.5,
+                    marker,
+                    ha="center",
+                    color="red",
+                    fontsize=14,
+                )
+
+    diag_y_max = diagnosis_data["Count"].max()
+    diag_y_min = diagnosis_data["Count"].min()
+    diag_padding = max((diag_y_max - diag_y_min) * 0.1, 0.1 * max(abs(diag_y_max), 1))
+    ax2.set_ylim(diag_y_min - diag_padding, diag_y_max + diag_padding)
+
+    ax2.set_title("Boxplot of Pathologic Diagnosis")
+    plt.suptitle("")
+    ax2.set_xlabel("Pathologic diagnosis")
+    ax2.set_ylabel("Normalized Gene Count")
+    ax2.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax2.tick_params(axis="x", labelrotation=45)
+    for tick in ax2.get_xticklabels():
+        tick.set_ha("right")
+    fig2.tight_layout()
+
+    img2 = io.BytesIO()
+    plt.savefig(img2, format="png")
+    img2.seek(0)
+    plot_url2 = base64.b64encode(img2.getvalue()).decode()
+    plt.close(fig2)
+
+    plot_url3 = None
+    if selection and selection.lower() != "diagnosis":
+        selection_data = pd.merge(
             gene_data,
             selected_annotations,
             left_on="Sample",
             right_on="SegmentDisplayName",
         ).dropna(subset=[selection])
+        if not selection_data.empty:
+            fig3, ax3 = plt.subplots(figsize=(8, 5))
+            selection_data.boxplot(
+                column="Count",
+                by=selection,
+                ax=ax3,
+                flierprops={"marker": ""},
+            )
 
-        # Draw boxplot
-        fig2, ax2 = plt.subplots()
-        plot_data.boxplot(
-            column="Count", by=selection, ax=ax2, flierprops={"marker": ""}
-        )
+            cats = [lbl.get_text() for lbl in ax3.get_xticklabels()]
+            for idx, cat in enumerate(cats, start=1):
+                mask = selection_data[selection] == cat
+                x = np.random.normal(idx, jitter_strength, size=mask.sum())
+                y = selection_data.loc[mask, "Count"]
+                ax3.scatter(x, y, color="black", alpha=0.7, s=point_size)
 
-        # Jitter points
-        jitter = 0.06
-        size = 5
-        cats = [lbl.get_text() for lbl in ax2.get_xticklabels()]
-        for i, cat in enumerate(cats, start=1):
-            mask = plot_data[selection] == cat
-            x = np.random.normal(i, jitter, mask.sum())
-            y = plot_data.loc[mask, "Count"]
-            ax2.scatter(x, y, color="black", alpha=0.7, s=size)
+            ax3.set_title(f"Boxplot of {gene} by {selection.title()}")
+            plt.suptitle("")
+            ax3.set_xlabel(selection)
+            ax3.set_ylabel("Normalized Gene Count")
+            ax3.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+            ax3.tick_params(axis="x", labelrotation=45)
+            for tick in ax3.get_xticklabels():
+                tick.set_ha("right")
+            fig3.tight_layout()
 
-        # Style
-        ax2.set_title(f"Boxplot of {gene} by {selection.title()}")
-        ax2.set_xlabel(selection)
-        ax2.set_ylabel("Normalized Gene Count")
-        ax2.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-        plt.suptitle("")  # remove auto “by …” label
+            img3 = io.BytesIO()
+            plt.savefig(img3, format="png")
+            img3.seek(0)
+            plot_url3 = base64.b64encode(img3.getvalue()).decode()
+            plt.close(fig3)
 
-        # Save it
-        img2 = io.BytesIO()
-        plt.savefig(img2, format="png")
-        img2.seek(0)
-        plot_url2 = base64.b64encode(img2.getvalue()).decode()
-        plt.close(fig2)
     response = {"plot_url1": f"data:image/png;base64,{plot_url1}"}
-    response["plot_url2"] = (
-        f"data:image/png;base64,{plot_url2}" if plot_url2 is not None else None
+    response["plot_url2"] = f"data:image/png;base64,{plot_url2}"
+    response["plot_url3"] = (
+        f"data:image/png;base64,{plot_url3}" if plot_url3 is not None else None
     )
     return jsonify(response)
 
