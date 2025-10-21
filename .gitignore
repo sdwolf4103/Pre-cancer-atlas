@@ -22,3 +22,6 @@ data/**/*.parquet
 # Logs / temp
 *.log
 *.tmp
+
+# Local cache
+pre-cancer-atlas-721dd33b3c50.json
