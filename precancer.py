@@ -242,8 +242,10 @@ def plot():
 
     # Load annotation data and apply renaming and filtering
     sel_type = request.form.get("type")
+    sel_type = sel_type or None
     try:
-        anno_data = _prepare_annotation(sel_type)
+        selected_annotations = _prepare_annotation(sel_type)
+        stroma_annotations = _prepare_annotation("stroma")
     except FileNotFoundError:
         return (
             jsonify(
@@ -260,81 +262,114 @@ def plot():
             500,
         )
 
-    # Select type
-    sel_type = sel_type or None
+    categories_order = [
+        "Stroma",
+        "NFT",
+        "Dormant",
+        "Mixed",
+        "Immunoreactive",
+        "Proliferative",
+        "HGSC",
+    ]
 
-    # Merge with gene data on 'Sample'
-    merged_data = pd.merge(
-        gene_data, anno_data, left_on="Sample", right_on="SegmentDisplayName"
+    def _merge_with_annotations(
+        annotations: pd.DataFrame, force_label: str | None = None
+    ) -> pd.DataFrame:
+        merged = pd.merge(
+            gene_data, annotations, left_on="Sample", right_on="SegmentDisplayName"
+        )
+        if merged.empty:
+            return merged
+        merged = merged.copy()
+        if force_label is not None:
+            merged["Molecular_Subtype"] = force_label
+        merged["Molecular_Subtype"] = pd.Categorical(
+            merged["Molecular_Subtype"], categories=categories_order, ordered=True
+        )
+        merged = merged.dropna(subset=["Molecular_Subtype"])
+        return merged
+
+    selected_data = _merge_with_annotations(selected_annotations)
+    stroma_data = _merge_with_annotations(stroma_annotations, force_label="Stroma")
+    plot_data = pd.concat([stroma_data, selected_data], ignore_index=True)
+    plot_data["Molecular_Subtype"] = pd.Categorical(
+        plot_data["Molecular_Subtype"], categories=categories_order, ordered=True
     )
-    # Ensure Molecular_Subtype has the correct categorical ordering
-    merged_data["Molecular_Subtype"] = pd.Categorical(
-        merged_data["Molecular_Subtype"],
-        categories=[
-            "NFT",
-            "Dormant",
-            "Mixed",
-            "Immunoreactive",
-            "Proliferative",
-            "HGSC",
-        ],
-        ordered=True,
-    )
-    # Generate the boxplot with individual points
+    plot_data = plot_data.dropna(subset=["Molecular_Subtype"])
+
+    if plot_data.empty:
+        return jsonify(error="No annotation data available for plotting."), 404
+
+    present_categories = [
+        cat
+        for cat in plot_data["Molecular_Subtype"].cat.categories
+        if (plot_data["Molecular_Subtype"] == cat).any()
+    ]
+    category_positions = {cat: idx + 1 for idx, cat in enumerate(present_categories)}
+
     fig, ax = plt.subplots()
-    boxplot = merged_data.boxplot(
+    plot_data.boxplot(
         column="Count",
         by="Molecular_Subtype",
         ax=ax,
-        flierprops={"marker": ""},  # Hide default outliers
+        flierprops={"marker": ""},
     )
-    diagnoses = merged_data["Molecular_Subtype"].unique()
 
-    # Overlay individual data points with reduced jitter
     jitter_strength = 0.06
     point_size = 5
-    # iterate over the ordered Molecular_Subtype categories
-    for i, subtype in enumerate(merged_data["Molecular_Subtype"].cat.categories):
-        mask = merged_data["Molecular_Subtype"] == subtype
-        x = np.random.normal(i + 1, jitter_strength, size=mask.sum())
-        y = merged_data.loc[mask, "Count"]
+    for subtype in present_categories:
+        mask = plot_data["Molecular_Subtype"] == subtype
+        x = np.random.normal(
+            category_positions[subtype], jitter_strength, size=mask.sum()
+        )
+        y = plot_data.loc[mask, "Count"]
         ax.scatter(x, y, color="black", alpha=0.7, s=point_size)
 
-    # Statistical comparison against "NFT" on Molecular_Subtype
-    nft_counts = merged_data.loc[merged_data["Molecular_Subtype"] == "NFT", "Count"]
-    # iterate over the ordered subtypes, skipping the first ("NFT")
-    for position, subtype in enumerate(
-        merged_data["Molecular_Subtype"].cat.categories[1:], start=2
-    ):
-        subtype_counts = merged_data.loc[
-            merged_data["Molecular_Subtype"] == subtype, "Count"
-        ]
-        t_stat, p_value = ttest_ind(nft_counts, subtype_counts)
+    nft_counts = plot_data.loc[plot_data["Molecular_Subtype"] == "NFT", "Count"]
+    if len(nft_counts) >= 2:
+        for subtype in present_categories:
+            if subtype in {"NFT", "Stroma"}:
+                continue
+            subtype_counts = plot_data.loc[
+                plot_data["Molecular_Subtype"] == subtype, "Count"
+            ]
+            if len(subtype_counts) < 2:
+                continue
+            _, p_value = ttest_ind(nft_counts, subtype_counts, equal_var=False)
+            marker = None
+            if p_value < 0.001:
+                marker = "***"
+            elif p_value < 0.01:
+                marker = "**"
+            elif p_value < 0.05:
+                marker = "*"
+            if marker:
+                y_max = plot_data["Count"].max()
+                y_min = plot_data["Count"].min()
+                padding = max((y_max - y_min) * 0.1, 0.1 * max(abs(y_max), 1))
+                ax.text(
+                    category_positions[subtype],
+                    y_max + padding * 0.5,
+                    marker,
+                    ha="center",
+                    color="red",
+                    fontsize=14,
+                )
 
-        # choose marker based on p-value
-        marker = None
-        if p_value < 0.001:
-            marker = "***"
-        elif p_value < 0.01:
-            marker = "**"
-        elif p_value < 0.05:
-            marker = "*"
+    y_max = plot_data["Count"].max()
+    y_min = plot_data["Count"].min()
+    padding = max((y_max - y_min) * 0.1, 0.1 * max(abs(y_max), 1))
+    ax.set_ylim(y_min - padding, y_max + padding)
 
-        if marker:
-            y_max = merged_data["Count"].max() * 1.05
-            ax.text(position, y_max, marker, ha="center", color="red", fontsize=14)
-
-    # Set y-axis limit slightly higher to fit asterisks within plot
-    ax.set_ylim(merged_data["Count"].min(), merged_data["Count"].max() * 1.2)
-
-    # Customize plot appearance
     plt.title(f"Boxplot of {gene} by Molecular Subtype")
-    plt.suptitle("")  # Removes the automatic title by Pandas
-    plt.xlabel("Molecular subtype")
-    plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Normalized Gene Count")
-    plt.tight_layout()
+    plt.suptitle("")
+    ax.set_xlabel("Molecular subtype")
+    ax.set_ylabel("Normalized Gene Count")
     ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax.tick_params(axis="x", labelrotation=45)
+    for tick in ax.get_xticklabels():
+        tick.set_ha("right")
+    fig.tight_layout()
 
     # Save plot to a string to display in HTML
     img = io.BytesIO()
@@ -349,7 +384,10 @@ def plot():
     if selection and sel_type != "stroma":
         # Merge and drop missing
         plot_data = pd.merge(
-            gene_data, anno_data, left_on="Sample", right_on="SegmentDisplayName"
+            gene_data,
+            selected_annotations,
+            left_on="Sample",
+            right_on="SegmentDisplayName",
         ).dropna(subset=[selection])
 
         # Draw boxplot
