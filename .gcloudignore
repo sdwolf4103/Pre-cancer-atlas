@@ -1,10 +1,16 @@
-# Common ignores
+# Keep this file minimal; it controls what gets uploaded for Cloud Build / Run
+.gcloudignore
 .git
+.gitignore
+.venv/
 __pycache__/
 *.pyc
 .env
 .env.*
 
-# Make sure these are INCLUDED
+# Explicitly INCLUDE web assets and build files
 !static/**
 !templates/**
+!Dockerfile
+!requirements.txt
+!app.py

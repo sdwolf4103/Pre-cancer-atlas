@@ -20,10 +20,29 @@ from googleapiclient.http import MediaIoBaseDownload
 from scipy.stats import ttest_ind
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+# If the app file lives in a subfolder, this will still find /static at the project root
+CANDIDATES = [HERE / "static", HERE.parent / "static", HERE.parent.parent / "static"]
+STATIC_DIR = next((p for p in CANDIDATES if p.exists()), HERE / "static")
+
+CANDIDATES_T = [
+    HERE / "templates",
+    HERE.parent / "templates",
+    HERE.parent.parent / "templates",
+]
+TEMPLATE_DIR = next((p for p in CANDIDATES_T if p.exists()), HERE / "templates")
+
+app = Flask(
+    __name__,
+    static_folder=str(HERE / "static"),
+    static_url_path="/static",
+    template_folder=str(HERE / "templates"),
+)
 
 matplotlib.use("Agg")
 
-app = Flask(__name__, static_folder="static", static_url_path="/static")
 DATA_DIR = Path(os.getenv("DATA_DIR", "data")).expanduser()
 COUNT_PATH = DATA_DIR / "count_data.parquet"
 ANNO_PATH = DATA_DIR / "anno_data.parquet"

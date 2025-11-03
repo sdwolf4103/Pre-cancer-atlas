@@ -20,6 +20,9 @@ data/
 data/*.parquet
 data/**/*.parquet
 
+# Secrets
+precancer-drive-key.json
+
 # Logs / temp
 *.log
 *.tmp

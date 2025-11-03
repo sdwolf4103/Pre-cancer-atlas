@@ -11,16 +11,20 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 再複製其他程式碼
-COPY . .
+# 明確複製程式碼 + 靜態資源（保證包含）
+COPY precancer.py /app/precancer.py
+COPY templates/ /app/templates/
+COPY static/ /app/static/
 
-# Cloud Run 會給我們 $PORT，Flask/gunicorn 要綁定它
+# （可留著一次來看）在 build 階段列出內容，若 static 缺失會一眼看出
+RUN echo "== BUILD LIST ==" && ls -la /app && echo "== /app/static ==" && ls -la /app/static || true
+
+# 環境
 ENV PORT=8080
-
-# 開放容器內的 8080
 EXPOSE 8080
 
-# 用 gunicorn 啟動： <模組>:<app物件>
-# 這裡是 precancer.py 內的 app 物件 → precancer:app
+# 以非 root 執行
 USER appuser
+
+# 用 gunicorn 啟動： <模組>:<app物件>
 CMD exec gunicorn -w 2 -k gthread -t 120 -b :$PORT precancer:app
