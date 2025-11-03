@@ -15,7 +15,45 @@ h1 {
 }
 
 form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
     margin-bottom: 20px; /* Add spacing below the form */
+}
+
+.form-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.form-field label {
+    white-space: nowrap; /* Keep label text on a single line */
+}
+
+
+.form-field select,
+.form-field input[type="text"] {
+    min-height: 36px;
+    height: 36px;
+    padding: 6px 10px;
+    box-sizing: border-box;
+}
+
+.gene-field .gene-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 240px;
+    max-width: 100%;
+}
+
+.gene-field input[type="text"] {
+    width: 100%;
 }
 
 label {
@@ -23,26 +61,77 @@ label {
 }
 
 input[type="text"] {
-    padding: 8px; /* Add padding to the text input */
+    padding: 6px 10px; /* Match select height */
     border-radius: 4px; /* Add rounded corners */
     border: 1px solid #ccc; /* Add a border */
 }
 
+.gene-suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+}
+
+.gene-suggestions.hidden {
+    display: none;
+}
+
+.gene-suggestion {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.gene-suggestion:hover,
+.gene-suggestion:focus {
+    background-color: #f0f4ff;
+}
+
+.gene-suggestion.empty {
+    color: #666;
+    cursor: default;
+    font-style: italic;
+}
+
 button[type="submit"] {
-    padding: 8px 16px; /* Add padding to the button */
+    padding: 6px 16px; /* Match control height */
+    height: 36px;
     border: none; /* Remove default button border */
     background-color: #868f9b; /* Set button background color */
     color: #fff; /* Set button text color */
     border-radius: 4px; /* Add rounded corners */
     cursor: pointer; /* Change cursor to pointer on hover */
+    font-weight: 600; /* Make button text bold */
 }
 
 button[type="submit"]:hover {
     background-color: #50565c; /* Change button background color on hover */
 }
 
+.form-submit {
+    align-self: center;
+}
+
 a {
     text-decoration: none; /* Remove underline from links */
     color: #007bff; /* Set link color */
     margin-right: 10px; /* Add spacing to the right of the link */
+}
+.form-field select {
+    min-width: 140px;
+    width: 160px;
 }

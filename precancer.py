@@ -20,25 +20,26 @@ from googleapiclient.http import MediaIoBaseDownload
 from scipy.stats import ttest_ind
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
-from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-# If the app file lives in a subfolder, this will still find /static at the project root
-CANDIDATES = [HERE / "static", HERE.parent / "static", HERE.parent.parent / "static"]
-STATIC_DIR = next((p for p in CANDIDATES if p.exists()), HERE / "static")
 
-CANDIDATES_T = [
-    HERE / "templates",
-    HERE.parent / "templates",
-    HERE.parent.parent / "templates",
-]
-TEMPLATE_DIR = next((p for p in CANDIDATES_T if p.exists()), HERE / "templates")
+
+def _resolve_asset_dir(name: str) -> Path:
+    """Return the first matching asset directory walking up the tree."""
+    for candidate in (HERE / name, HERE.parent / name, HERE.parent.parent / name):
+        if candidate.exists():
+            return candidate
+    return HERE / name
+
+
+STATIC_DIR = _resolve_asset_dir("static")
+TEMPLATE_DIR = _resolve_asset_dir("templates")
 
 app = Flask(
     __name__,
-    static_folder=str(HERE / "static"),
+    static_folder=str(STATIC_DIR),
     static_url_path="/static",
-    template_folder=str(HERE / "templates"),
+    template_folder=str(TEMPLATE_DIR),
 )
 
 matplotlib.use("Agg")
@@ -168,6 +169,26 @@ def _read_gene_row(gene: str) -> pd.DataFrame:
 
 
 @lru_cache(maxsize=1)
+def _list_available_genes() -> list[str]:
+    _ensure_local(COUNT_PATH, COUNT_FILE_ID)
+    try:
+        parquet_file = pq.ParquetFile(COUNT_PATH)
+    except Exception as exc:
+        logger.warning("Unable to open count parquet for gene list: %s", exc)
+        raise
+
+    genes: set[str] = set()
+    for row_group_idx in range(parquet_file.num_row_groups):
+        chunk = parquet_file.read_row_group(row_group_idx, columns=["Gene"]).column("Gene")
+        for entry in chunk.to_pylist():
+            if isinstance(entry, str):
+                normalized = entry.strip().upper()
+                if normalized:
+                    genes.add(normalized)
+    return sorted(genes)
+
+
+@lru_cache(maxsize=1)
 def _load_annotation_base() -> pd.DataFrame:
     _ensure_local(ANNO_PATH, ANNO_FILE_ID)
     df = pd.read_parquet(
@@ -223,6 +244,23 @@ def _prepare_annotation(sel_type: str | None) -> pd.DataFrame:
 @app.route("/")
 def home():
     return render_template("pre_cancer_atlas.html")
+
+
+@app.route("/genes")
+def gene_suggestions():
+    query = (request.args.get("q") or "").strip().upper()
+    try:
+        genes = _list_available_genes()
+    except Exception as exc:
+        logger.warning("Gene lookup failed: %s", exc)
+        return jsonify([])
+
+    if query:
+        filtered = [g for g in genes if g.startswith(query)]
+    else:
+        filtered = genes
+
+    return jsonify(filtered[:20])
 
 
 @app.route("/pre_cancer_atlas", methods=["POST"])
@@ -539,8 +577,8 @@ def plot():
             plot_url3 = base64.b64encode(img3.getvalue()).decode()
             plt.close(fig3)
 
-    response = {"plot_url1": f"data:image/png;base64,{plot_url1}"}
-    response["plot_url2"] = f"data:image/png;base64,{plot_url2}"
+    response = {"plot_url1": f"data:image/png;base64,{plot_url2}"}
+    response["plot_url2"] = f"data:image/png;base64,{plot_url1}"
     response["plot_url3"] = (
         f"data:image/png;base64,{plot_url3}" if plot_url3 is not None else None
     )

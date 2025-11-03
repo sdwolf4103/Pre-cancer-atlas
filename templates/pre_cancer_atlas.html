@@ -10,25 +10,40 @@
     <h1>Pre-cancer Atlas</h1>
     <p>Please enter a gene name and select a category if desired:</p>
     <form id="plotForm" onsubmit="generatePlot(); return false;">
-        <label for="type">Select Type:</label>
-        <select name="type" id="type">
-            <option value="epithelium">Epithelium</option>
-            <option value="stroma">Stroma</option>
-        </select>   
+        <div class="form-field">
+            <label for="type">Select Type:</label>
+            <select name="type" id="type">
+                <option value="epithelium">Epithelium</option>
+                <option value="stroma">Stroma</option>
+            </select>   
+        </div>
 
-        <label for="gene">Enter Gene:</label>
-        <input type="text" id="gene" name="gene" placeholder="Enter gene name" required>   
+        <div class="form-field gene-field">
+            <label for="gene">Enter Gene:</label>
+            <div class="gene-input-wrapper">
+                <input
+                    type="text"
+                    id="gene"
+                    name="gene"
+                    placeholder="Enter gene name"
+                    autocomplete="off"
+                    required>
+                <div id="gene-suggestions" class="gene-suggestions hidden"></div>
+            </div>
+        </div>
 
-        <label for="selection">Select Category:</label>
-        <select name="selection" id="selection">
-            <option value="">None</option>
-            <option value="p53 pattern">p53 pattern</option>
-            <option value="Decision Tree">Path</option>
-            <option value="Morphology category">Morphology category</option>
-            <option value="BRCA category">BRCA category</option>
-        </select>
+        <div class="form-field">
+            <label for="selection">(Optional) Select Category:</label>
+            <select name="selection" id="selection">
+                <option value="">None</option>
+                <option value="p53 pattern">p53 pattern</option>
+                <option value="Decision Tree">Path</option>
+                <option value="Morphology category">Morphology category</option>
+                <option value="BRCA category">BRCA category</option>
+            </select>
+        </div>
 
-        <button type="submit">Generate Plot</button>
+        <button type="submit" class="form-submit">Generate Plot</button>
     </form>
 
     <div id="plot"></div>
@@ -37,9 +52,94 @@
     <div id="error" style="color: red;"></div>
 
     <script>
+        const geneInput    = document.getElementById("gene");
+        const geneSuggestions = document.getElementById("gene-suggestions");
+        let geneController = null;
+
+        function clearGeneSuggestions() {
+          geneSuggestions.innerHTML = "";
+          geneSuggestions.classList.add("hidden");
+        }
+
+        function showGeneSuggestions(names) {
+          geneSuggestions.innerHTML = "";
+          if (!names || names.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "gene-suggestion empty";
+            empty.textContent = "No matching genes";
+            geneSuggestions.appendChild(empty);
+          } else {
+            names.forEach(name => {
+              const option = document.createElement("button");
+              option.type = "button";
+              option.className = "gene-suggestion";
+              option.textContent = name;
+              option.addEventListener("mousedown", event => {
+                event.preventDefault();
+                geneInput.value = name;
+                clearGeneSuggestions();
+              });
+              geneSuggestions.appendChild(option);
+            });
+          }
+          geneSuggestions.classList.remove("hidden");
+        }
+
+        function updateGeneSuggestions(term) {
+          if (geneController) {
+            geneController.abort();
+            geneController = null;
+          }
+
+          if (!term || term.length < 1) {
+            clearGeneSuggestions();
+            return;
+          }
+
+          const controller =
+            typeof AbortController !== "undefined" ? new AbortController() : null;
+          geneController = controller;
+
+          const fetchOptions = controller ? { signal: controller.signal } : {};
+          fetch(`/genes?q=${encodeURIComponent(term)}`, fetchOptions)
+            .then(res => (res.ok ? res.json() : []))
+            .then(names => {
+              showGeneSuggestions(names);
+              geneController = null;
+            })
+            .catch(err => {
+              if (!err || err.name !== "AbortError") {
+                console.error("Gene suggestion lookup failed", err);
+              }
+              geneController = null;
+              clearGeneSuggestions();
+            });
+        }
+
+        geneInput.addEventListener("input", event => {
+          const value = (event.target.value || "").trim().toUpperCase();
+          if (event.target.value !== value) {
+            event.target.value = value;
+          }
+          updateGeneSuggestions(value);
+        });
+
+        geneInput.addEventListener("focus", event => {
+          const value = (event.target.value || "").trim().toUpperCase();
+          if (event.target.value !== value) {
+            event.target.value = value;
+          }
+          updateGeneSuggestions(value);
+        });
+
+        geneInput.addEventListener("blur", () => {
+          setTimeout(() => {
+            clearGeneSuggestions();
+          }, 120);
+        });
+
         function generatePlot() {
           const form      = document.getElementById("plotForm");
-          const geneInput = document.getElementById("gene");
           const geneValue = (geneInput.value || "").trim().toUpperCase();
           geneInput.value = geneValue;
 
@@ -58,11 +158,11 @@
             return res.json();
           })
           .then(data => {
-            // Always show first plot
+            // Always show first plot (Diagnosis)
             document.getElementById("plot").innerHTML =
-              `<img src="${data.plot_url1}" alt="Boxplot of Gene Count">`;
-      
-            // Now handle the second plot
+              `<img src="${data.plot_url1}" alt="Boxplot of Pathologic Diagnosis">`;
+
+            // Now handle the second plot (Molecular subtype)
             const secondDiv = document.getElementById("additionalPlot");
             const thirdDiv  = document.getElementById("selectionPlot");
             secondDiv.innerHTML = "";
@@ -70,7 +170,7 @@
 
             if (typeof data.plot_url2 === "string" && data.plot_url2.startsWith("data:image")) {
               secondDiv.innerHTML =
-                `<img src="${data.plot_url2}" alt="Boxplot of Pathologic Diagnosis">`;
+                `<img src="${data.plot_url2}" alt="Boxplot of Molecular Subtype">`;
             }
 
             if (
