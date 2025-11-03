@@ -1,0 +1,10 @@
+# Common ignores
+.git
+__pycache__/
+*.pyc
+.env
+.env.*
+
+# Make sure these are INCLUDED
+!static/**
+!templates/**

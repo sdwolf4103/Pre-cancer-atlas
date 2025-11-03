@@ -16,6 +16,7 @@ __pypackages__/
 .idea/
 
 # Data (never commit)
+data/
 data/*.parquet
 data/**/*.parquet
 

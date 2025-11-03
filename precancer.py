@@ -23,7 +23,7 @@ from werkzeug.exceptions import HTTPException
 
 matplotlib.use("Agg")
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 DATA_DIR = Path(os.getenv("DATA_DIR", "data")).expanduser()
 COUNT_PATH = DATA_DIR / "count_data.parquet"
 ANNO_PATH = DATA_DIR / "anno_data.parquet"

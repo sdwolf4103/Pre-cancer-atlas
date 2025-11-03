@@ -1,6 +1,13 @@
 body {
-    font-family: Arial, sans-serif; /* Apply the same font-family as used in the Nanostring page */
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; /* Force a clean sans-serif stack across the page */
     padding: 20px; /* Add padding for better spacing */
+}
+
+button,
+input,
+select,
+textarea {
+    font-family: inherit; /* Ensure form controls take the same sans-serif font */
 }
 
 h1 {
