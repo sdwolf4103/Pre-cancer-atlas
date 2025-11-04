@@ -8,43 +8,106 @@
 </head>
 <body>
     <h1>Pre-cancer Atlas</h1>
-    <p>Please enter a gene name and select a category if desired:</p>
-    <form id="plotForm" onsubmit="generatePlot(); return false;">
-        <div class="form-field">
-            <label for="type">Select Type:</label>
-            <select name="type" id="type">
-                <option value="epithelium">Epithelium</option>
-                <option value="stroma">Stroma</option>
-            </select>   
-        </div>
 
-        <div class="form-field gene-field">
-            <label for="gene">Enter Gene:</label>
-            <div class="gene-input-wrapper">
+    <div class="view-toggle">
+        <p>Select the type of visualization you would like to explore:</p>
+        <label>
+            <input type="radio" name="view-mode" value="expression">
+            Gene expression boxplot
+        </label>
+        <label>
+            <input type="radio" name="view-mode" value="correlation">
+            Gene correlation
+        </label>
+    </div>
+
+    <section id="expressionSection" class="hidden">
+        <p>Please enter a gene name and select a category if desired:</p>
+        <form id="plotForm" onsubmit="generatePlot(); return false;">
+            <div class="form-field">
+                <label for="type">Select Type:</label>
+                <select name="type" id="type">
+                    <option value="epithelium">Epithelium</option>
+                    <option value="stroma">Stroma</option>
+                </select>
+            </div>
+
+            <div class="form-field gene-field">
+                <label for="gene">Enter Gene:</label>
+                <div class="gene-input-wrapper">
+                    <input
+                        type="text"
+                        id="gene"
+                        name="gene"
+                        placeholder="Enter gene name"
+                        autocomplete="off"
+                        required>
+                    <div id="gene-suggestions" class="gene-suggestions hidden"></div>
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label for="selection">(Optional) Select Category:</label>
+                <select name="selection" id="selection">
+                    <option value="">None</option>
+                    <option value="p53 pattern">p53 pattern</option>
+                    <option value="Decision Tree">Path</option>
+                    <option value="Morphology category">Morphology category</option>
+                    <option value="BRCA category">BRCA category</option>
+                </select>
+            </div>
+
+            <button type="submit" class="form-submit">Generate Plot</button>
+        </form>
+    </section>
+
+    <section id="correlationSection" class="hidden">
+        <p>Please enter a category and two genes to view their correlation:</p>
+        <form id="correlationForm" onsubmit="generateCorrelation(); return false;">
+            <div class="form-field">
+                <label for="corCategory">Select Category:</label>
+                <select name="category" id="corCategory">
+                    <option value="diagnosis" selected>Diagnosis</option>
+                    <option value="molecular">Molecular category</option>
+                    <option value="decision-tree">Path</option>
+                    <option value="morphology">Morphology category</option>
+                    <option value="brca">BRCA category</option>
+                </select>
+            </div>
+
+            <div class="form-field hidden detail-field" id="categoryDetailWrapper">
+                <span class="detail-label">Select Detail(s):</span>
+                <details class="multi-select" id="categoryDetailDropdown">
+                    <summary id="categoryDetailSummary">Select detail(s)</summary>
+                    <div id="categoryDetailOptions" class="multi-select-options"></div>
+                </details>
+            </div>
+
+            <div class="form-field gene-input-line">
+                <label for="geneA">Enter Gene A:</label>
                 <input
                     type="text"
-                    id="gene"
-                    name="gene"
-                    placeholder="Enter gene name"
+                    id="geneA"
+                    name="geneA"
+                    placeholder="Enter first gene"
                     autocomplete="off"
                     required>
-                <div id="gene-suggestions" class="gene-suggestions hidden"></div>
             </div>
-        </div>
 
-        <div class="form-field">
-            <label for="selection">(Optional) Select Category:</label>
-            <select name="selection" id="selection">
-                <option value="">None</option>
-                <option value="p53 pattern">p53 pattern</option>
-                <option value="Decision Tree">Path</option>
-                <option value="Morphology category">Morphology category</option>
-                <option value="BRCA category">BRCA category</option>
-            </select>
-        </div>
+            <div class="form-field gene-input-line">
+                <label for="geneB">Enter Gene B:</label>
+                <input
+                    type="text"
+                    id="geneB"
+                    name="geneB"
+                    placeholder="Enter second gene"
+                    autocomplete="off"
+                    required>
+            </div>
 
-        <button type="submit" class="form-submit">Generate Plot</button>
-    </form>
+            <button type="submit" class="form-submit">Generate Correlation</button>
+        </form>
+    </section>
 
     <div id="plot"></div>
     <div id="additionalPlot"></div>
@@ -52,9 +115,159 @@
     <div id="error" style="color: red;"></div>
 
     <script>
+        const viewRadios   = document.querySelectorAll('input[name="view-mode"]');
+        const expressionSection = document.getElementById("expressionSection");
+        const correlationSection = document.getElementById("correlationSection");
         const geneInput    = document.getElementById("gene");
         const geneSuggestions = document.getElementById("gene-suggestions");
         let geneController = null;
+
+        const categorySelect  = document.getElementById("corCategory");
+        const categoryDetailWrapper = document.getElementById("categoryDetailWrapper");
+        const categoryDetailDropdown = document.getElementById("categoryDetailDropdown");
+        const categoryDetailOptions = document.getElementById("categoryDetailOptions");
+        const categoryDetailSummary = document.getElementById("categoryDetailSummary");
+
+        const categoryDetails = {
+          molecular: [
+            { value: "NFT", label: "NFT" },
+            { value: "Dormant", label: "Dormant" },
+            { value: "Mixed", label: "Mixed" },
+            { value: "Immunoreactive", label: "Immunoreactive" },
+            { value: "Proliferative", label: "Proliferative" },
+            { value: "HGSC", label: "HGSC" }
+          ],
+          "decision-tree": [
+            { value: "Path 1", label: "Path 1" },
+            { value: "Path 2", label: "Path 2" },
+            { value: "Path 3", label: "Path 3" },
+            { value: "Path 4", label: "Path 4" },
+            { value: "Path 5", label: "Path 5" }
+          ],
+          morphology: [
+            { value: "Flat", label: "Flat" },
+            { value: "BLAD", label: "BLAD" }
+          ],
+          brca: [
+            { value: "BRCA1", label: "BRCA1" },
+            { value: "BRCA2", label: "BRCA2" },
+            { value: "Negative", label: "Negative" },
+            { value: "Other", label: "Other" }
+          ],
+          diagnosis: [
+            { value: "NFT", label: "NFT" },
+            { value: "p53 sig", label: "p53 signature" },
+            { value: "STIL", label: "STIL" },
+            { value: "STIC", label: "STIC" },
+            { value: "HGSC", label: "HGSC" }
+          ]
+        };
+
+        function updateViewMode() {
+          let activeMode = null;
+          viewRadios.forEach(radio => {
+            if (radio.checked) {
+              activeMode = radio.value;
+            }
+          });
+
+          if (activeMode === "expression") {
+            expressionSection.classList.remove("hidden");
+            correlationSection.classList.add("hidden");
+          } else if (activeMode === "correlation") {
+            correlationSection.classList.remove("hidden");
+            expressionSection.classList.add("hidden");
+          } else {
+            expressionSection.classList.add("hidden");
+            correlationSection.classList.add("hidden");
+          }
+        }
+
+        viewRadios.forEach(radio => {
+          radio.addEventListener("change", updateViewMode);
+        });
+
+        updateViewMode();
+
+        function resetCategoryDetail() {
+          categoryDetailOptions.innerHTML = "";
+          categoryDetailSummary.textContent = "Select detail(s)";
+          if (categoryDetailDropdown) {
+            categoryDetailDropdown.open = false;
+          }
+          categoryDetailWrapper.classList.add("hidden");
+        }
+
+        function updateCategoryDetailSummary() {
+          const checked = Array.from(
+            categoryDetailOptions.querySelectorAll('input[type="checkbox"]:checked')
+          ).map(input => input.dataset.label || input.value);
+          if (checked.length === 0) {
+            categoryDetailSummary.textContent = "Select detail(s)";
+          } else if (checked.length <= 2) {
+            categoryDetailSummary.textContent = checked.join(", ");
+          } else {
+            categoryDetailSummary.textContent = `${checked.length} selected`;
+          }
+        }
+
+        function populateCategoryDetail(items) {
+          categoryDetailOptions.innerHTML = "";
+          items.forEach(item => {
+            const optionLabel = document.createElement("label");
+            optionLabel.className = "multi-option";
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "category_detail";
+            checkbox.value = item.value;
+            checkbox.dataset.label = item.label;
+            checkbox.addEventListener("change", updateCategoryDetailSummary);
+
+            const span = document.createElement("span");
+            span.textContent = item.label;
+
+            optionLabel.appendChild(checkbox);
+            optionLabel.appendChild(span);
+            categoryDetailOptions.appendChild(optionLabel);
+          });
+          updateCategoryDetailSummary();
+          if (categoryDetailDropdown) {
+            categoryDetailDropdown.open = false;
+          }
+          categoryDetailWrapper.classList.remove("hidden");
+        }
+
+        function refreshCategoryDetail() {
+          const value = categorySelect.value;
+          if (categoryDetails[value] && categoryDetails[value].length > 0) {
+            populateCategoryDetail(categoryDetails[value]);
+          } else {
+            resetCategoryDetail();
+          }
+        }
+
+        categorySelect.addEventListener("change", refreshCategoryDetail);
+
+        resetCategoryDetail();
+        refreshCategoryDetail();
+
+        document.addEventListener("click", event => {
+          if (
+            categoryDetailDropdown &&
+            categoryDetailDropdown.open &&
+            !categoryDetailDropdown.contains(event.target)
+          ) {
+            categoryDetailDropdown.open = false;
+          }
+        });
+
+        function generateCorrelation() {
+          // Placeholder until correlation endpoint is wired up.
+          document.getElementById("error").innerText =
+            "Correlation view is coming soon.";
+          return false;
+        }
 
         function clearGeneSuggestions() {
           geneSuggestions.innerHTML = "";
