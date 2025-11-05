@@ -3,9 +3,11 @@ import io
 import json
 import logging
 import os
+import threading
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from typing import Dict, List, Optional
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -73,6 +75,13 @@ CATEGORY_LABEL_MAP = {
 }
 
 DEFAULT_CORRELATION_TYPE = "epithelium"
+
+_COUNT_PARQUET: Optional[pq.ParquetFile] = None
+_COUNT_PARQUET_LOCK = threading.Lock()
+_GENE_ROW_GROUP_CACHE: Dict[str, List[int]] = {}
+_GENE_ROW_GROUP_CACHE_LOCK = threading.Lock()
+_ANNOTATION_CACHE: Dict[Optional[str], pd.DataFrame] = {}
+_ANNOTATION_CACHE_LOCK = threading.Lock()
 
 
 def _drive_client():
@@ -173,17 +182,64 @@ def _handle_exception(error):
     return jsonify(error="Internal server error"), 500
 
 
-def _read_gene_row(gene: str) -> pd.DataFrame:
-    pf = pq.ParquetFile(COUNT_PATH)
-    gene_scalar = pa.scalar(gene)
+def _get_count_parquet() -> pq.ParquetFile:
+    global _COUNT_PARQUET
+    with _COUNT_PARQUET_LOCK:
+        if _COUNT_PARQUET is None:
+            _ensure_local(COUNT_PATH, COUNT_FILE_ID)
+            _COUNT_PARQUET = pq.ParquetFile(COUNT_PATH)
+    return _COUNT_PARQUET
+
+
+def _get_gene_row_groups(gene: str, pf: pq.ParquetFile) -> List[int]:
+    normalized = (gene or "").strip().upper()
+    if not normalized:
+        return []
+
+    with _GENE_ROW_GROUP_CACHE_LOCK:
+        cached = _GENE_ROW_GROUP_CACHE.get(normalized)
+    if cached is not None:
+        return cached
+
+    gene_scalar = pa.scalar(normalized)
+    matches: List[int] = []
     for rg in range(pf.num_row_groups):
         gene_only = pf.read_row_group(rg, columns=["Gene"])
         mask = pc.equal(gene_only.column("Gene"), gene_scalar)
         if pc.any(mask).as_py():
-            full = pf.read_row_group(rg)
-            filtered = full.filter(pc.equal(full.column("Gene"), gene_scalar))
-            return filtered.to_pandas()
-    return pd.DataFrame()
+            matches.append(rg)
+
+    with _GENE_ROW_GROUP_CACHE_LOCK:
+        _GENE_ROW_GROUP_CACHE[normalized] = matches
+    return matches
+
+
+def _read_gene_row(gene: str) -> pd.DataFrame:
+    normalized = (gene or "").strip().upper()
+    if not normalized:
+        return pd.DataFrame()
+
+    pf = _get_count_parquet()
+    row_groups = _get_gene_row_groups(normalized, pf)
+    if not row_groups:
+        return pd.DataFrame()
+
+    gene_scalar = pa.scalar(normalized)
+    tables = []
+    for rg in row_groups:
+        full = pf.read_row_group(rg)
+        mask = pc.equal(full.column("Gene"), gene_scalar)
+        if not pc.any(mask).as_py():
+            continue
+        tables.append(full.filter(mask))
+
+    if not tables:
+        with _GENE_ROW_GROUP_CACHE_LOCK:
+            _GENE_ROW_GROUP_CACHE[normalized] = []
+        return pd.DataFrame()
+
+    table = pa.concat_tables(tables) if len(tables) > 1 else tables[0]
+    return table.to_pandas()
 
 
 def _extract_gene_counts(gene: str) -> pd.DataFrame:
@@ -214,9 +270,8 @@ def _extract_gene_counts(gene: str) -> pd.DataFrame:
 
 @lru_cache(maxsize=1)
 def _list_available_genes() -> list[str]:
-    _ensure_local(COUNT_PATH, COUNT_FILE_ID)
     try:
-        parquet_file = pq.ParquetFile(COUNT_PATH)
+        parquet_file = _get_count_parquet()
     except Exception as exc:
         logger.warning("Unable to open count parquet for gene list: %s", exc)
         raise
