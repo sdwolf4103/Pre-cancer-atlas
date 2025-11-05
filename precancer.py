@@ -60,7 +60,6 @@ logger = logging.getLogger(__name__)
 
 CATEGORY_COLUMN_MAP = {
     "molecular": "Molecular_Subtype",
-    "decision-tree": "Decision Tree",
     "morphology": "Morphology category",
     "brca": "BRCA category",
     "diagnosis": "Diagnosis",
@@ -68,7 +67,6 @@ CATEGORY_COLUMN_MAP = {
 
 CATEGORY_LABEL_MAP = {
     "Molecular_Subtype": "Molecular category",
-    "Decision Tree": "Path",
     "Morphology category": "Morphology category",
     "BRCA category": "BRCA category",
     "Diagnosis": "Diagnosis",
@@ -750,18 +748,38 @@ def correlation():
     if category_column:
         annotations = annotations.dropna(subset=[category_column])
         if detail_values:
+            filter_values: set = set()
             if "*" in detail_values:
                 detail_values = []
                 summary_detail_values = (
                     annotations[category_column].dropna().unique().tolist()
                 )
             if detail_values:
-                filter_values = set(detail_values)
-                if category_column == "Diagnosis" and "STIC" in filter_values:
-                    filter_values.add("STICL")
-                annotations = annotations[
-                    annotations[category_column].isin(filter_values)
-                ]
+                if category_column == "BRCA category":
+                    unique_values = annotations[category_column].dropna().unique()
+                    normalized_unique = [
+                        (str(value).strip(), value) for value in unique_values
+                    ]
+                    for selected in detail_values:
+                        if selected == "Negative":
+                            for text, original in normalized_unique:
+                                if text.lower() == "negative":
+                                    filter_values.add(original)
+                        elif selected == "Other":
+                            for text, original in normalized_unique:
+                                lower = text.lower()
+                                if text not in {"BRCA1", "BRCA2"} and lower != "negative":
+                                    filter_values.add(original)
+                        else:
+                            filter_values.add(selected)
+                else:
+                    filter_values = set(detail_values)
+                    if category_column == "Diagnosis" and "STIC" in filter_values:
+                        filter_values.add("STICL")
+                if filter_values:
+                    annotations = annotations[
+                        annotations[category_column].isin(filter_values)
+                    ]
 
     if annotations.empty:
         return (
