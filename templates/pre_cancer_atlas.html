@@ -55,7 +55,10 @@
                 </select>
             </div>
 
-            <button type="submit" class="form-submit">Generate Plot</button>
+            <button type="submit" class="form-submit" id="generatePlotButton">
+                <span class="label">Generate Plot</span>
+                <span class="loading-spinner" aria-hidden="true"></span>
+            </button>
         </form>
     </section>
 
@@ -107,7 +110,10 @@
                 </div>
             </div>
 
-            <button type="submit" class="form-submit">Generate Correlation</button>
+            <button type="submit" class="form-submit" id="generateCorrelationButton">
+                <span class="label">Generate Correlation</span>
+                <span class="loading-spinner" aria-hidden="true"></span>
+            </button>
         </form>
 
         <div id="correlationResult" class="hidden">
@@ -154,6 +160,10 @@
         const correlationPlotDiv = document.getElementById("correlationPlot");
         const correlationStatsDiv = document.getElementById("correlationStats");
         const correlationError = document.getElementById("correlationError");
+        const generatePlotButton = document.getElementById("generatePlotButton");
+        const generateCorrelationButton = document.getElementById(
+          "generateCorrelationButton"
+        );
 
         function setupGeneAutocomplete(inputElement, suggestionElement) {
           if (!inputElement || !suggestionElement) {
@@ -559,6 +569,11 @@
             categoryDetailDropdown.open = false;
           }
 
+          if (generateCorrelationButton) {
+            generateCorrelationButton.disabled = true;
+            generateCorrelationButton.classList.add("is-loading");
+          }
+
           fetch("/pre_cancer_correlation", {
             method: "POST",
             body: formData
@@ -606,6 +621,12 @@
                 err && err.message
                   ? err.message
                   : "Unable to generate correlation.";
+            })
+            .finally(() => {
+              if (generateCorrelationButton) {
+                generateCorrelationButton.disabled = false;
+                generateCorrelationButton.classList.remove("is-loading");
+              }
             });
 
           return false;
@@ -619,6 +640,11 @@
           const formData = new FormData(form);
           const selCat   = formData.get("selection") || "";
           formData.set("gene", geneValue);
+
+          if (generatePlotButton) {
+            generatePlotButton.disabled = true;
+            generatePlotButton.classList.add("is-loading");
+          }
       
           fetch("/pre_cancer_atlas", {
             method: "POST",
@@ -662,6 +688,12 @@
             document.getElementById("plot").innerHTML          = "";
             document.getElementById("additionalPlot").innerHTML = "";
             document.getElementById("error").innerText         = err.message;
+          })
+          .finally(() => {
+            if (generatePlotButton) {
+              generatePlotButton.disabled = false;
+              generatePlotButton.classList.remove("is-loading");
+            }
           });
         }
       </script>
