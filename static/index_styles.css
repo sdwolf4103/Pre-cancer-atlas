@@ -308,6 +308,55 @@ button[type="submit"]:hover {
     align-self: center;
 }
 
+#generatePlotButton,
+#generateCorrelationButton {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+}
+
+#generatePlotButton .label,
+#generateCorrelationButton .label {
+    grid-area: 1 / 1 / 2 / 2;
+    transition: opacity 0.15s ease;
+}
+
+#generatePlotButton .loading-spinner,
+#generateCorrelationButton .loading-spinner {
+    grid-area: 1 / 1 / 2 / 2;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #ffffff;
+    display: none;
+    animation: button-spin 0.9s linear infinite;
+}
+
+#generatePlotButton.is-loading .label,
+#generateCorrelationButton.is-loading .label {
+    opacity: 0;
+}
+
+#generatePlotButton.is-loading .loading-spinner,
+#generateCorrelationButton.is-loading .loading-spinner {
+    display: block;
+}
+
+#generatePlotButton.is-loading,
+#generateCorrelationButton.is-loading {
+    pointer-events: none;
+}
+
+@keyframes button-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 a {
     text-decoration: none; /* Remove underline from links */
     color: #007bff; /* Set link color */
