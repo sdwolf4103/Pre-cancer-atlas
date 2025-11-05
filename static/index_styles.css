@@ -2,6 +2,17 @@ body {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; /* Force a clean sans-serif stack across the page */
     padding: 20px; /* Add padding for better spacing */
     font-size: 14px;
+
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.page-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 button,
@@ -305,4 +316,22 @@ a {
 .form-field select {
     min-width: 140px;
     width: 160px;
+}
+
+.site-disclaimer {
+    margin-top: 40px;
+    padding: 10px;
+    background: #f9fafb;
+    border-top: 1px solid #d0d7de;
+    font-size: 9px;
+    line-height: 1.00;
+    color: #4b5563;
+}
+
+.site-disclaimer p {
+    margin: 0 0 12px 0;
+}
+
+.site-disclaimer p:last-child {
+    margin-bottom: 0;
 }
