@@ -17,7 +17,7 @@ import pyarrow.parquet as pq
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind, pearsonr
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
@@ -55,6 +55,24 @@ ANNO_FILE_ID = os.getenv("ANNO_FILE_ID")
 SA_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 logger = logging.getLogger(__name__)
+
+CATEGORY_COLUMN_MAP = {
+    "molecular": "Molecular_Subtype",
+    "decision-tree": "Decision Tree",
+    "morphology": "Morphology category",
+    "brca": "BRCA category",
+    "diagnosis": "Diagnosis",
+}
+
+CATEGORY_LABEL_MAP = {
+    "Molecular_Subtype": "Molecular category",
+    "Decision Tree": "Path",
+    "Morphology category": "Morphology category",
+    "BRCA category": "BRCA category",
+    "Diagnosis": "Diagnosis",
+}
+
+DEFAULT_CORRELATION_TYPE = "epithelium"
 
 
 def _drive_client():
@@ -168,6 +186,32 @@ def _read_gene_row(gene: str) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _extract_gene_counts(gene: str) -> pd.DataFrame:
+    """Return count values for a single gene indexed by sample."""
+    if not gene:
+        return pd.DataFrame()
+
+    try:
+        gene_frame = _read_gene_row(gene)
+    except Exception as exc:
+        logger.warning("Unable to read gene row for %s: %s", gene, exc)
+        raise
+
+    if gene_frame.empty:
+        return pd.DataFrame()
+
+    gene_frame = gene_frame.set_index("Gene")
+    try:
+        series = gene_frame.loc[gene]
+    except KeyError:
+        return pd.DataFrame()
+
+    counts = series.to_frame(name="Count").reset_index()
+    counts.columns = ["Sample", "Count"]
+    counts["Sample"] = counts["Sample"].astype(str)
+    return counts
+
+
 @lru_cache(maxsize=1)
 def _list_available_genes() -> list[str]:
     _ensure_local(COUNT_PATH, COUNT_FILE_ID)
@@ -179,7 +223,9 @@ def _list_available_genes() -> list[str]:
 
     genes: set[str] = set()
     for row_group_idx in range(parquet_file.num_row_groups):
-        chunk = parquet_file.read_row_group(row_group_idx, columns=["Gene"]).column("Gene")
+        chunk = parquet_file.read_row_group(row_group_idx, columns=["Gene"]).column(
+            "Gene"
+        )
         for entry in chunk.to_pylist():
             if isinstance(entry, str):
                 normalized = entry.strip().upper()
@@ -582,6 +628,179 @@ def plot():
     response["plot_url3"] = (
         f"data:image/png;base64,{plot_url3}" if plot_url3 is not None else None
     )
+    return jsonify(response)
+
+
+@app.route("/pre_cancer_correlation", methods=["POST"])
+def correlation():
+    gene_a = (request.form.get("geneA") or "").strip().upper()
+    gene_b = (request.form.get("geneB") or "").strip().upper()
+    if not gene_a or not gene_b:
+        return jsonify(error="Both Gene A and Gene B are required."), 400
+
+    sel_type = (request.form.get("type") or DEFAULT_CORRELATION_TYPE).strip().lower()
+    if sel_type not in {"epithelium", "stroma"}:
+        sel_type = DEFAULT_CORRELATION_TYPE
+
+    category_key = (request.form.get("category") or "").strip()
+    detail_values = [
+        value for value in request.form.getlist("category_detail") if value
+    ]
+
+    try:
+        _ensure_local(COUNT_PATH, COUNT_FILE_ID)
+        gene_a_counts = _extract_gene_counts(gene_a)
+        gene_b_counts = _extract_gene_counts(gene_b)
+    except FileNotFoundError:
+        return (
+            jsonify(
+                error=(
+                    "Count data file not found. "
+                    "Set DATA_DIR to the directory containing count_data.parquet."
+                )
+            ),
+            500,
+        )
+    except Exception as exc:
+        return jsonify(error=f"Unable to load gene counts: {exc}"), 500
+
+    if gene_a_counts.empty:
+        return jsonify(error=f"The gene '{gene_a}' is not in the database."), 404
+    if gene_b_counts.empty:
+        return jsonify(error=f"The gene '{gene_b}' is not in the database."), 404
+
+    gene_a_counts = gene_a_counts.rename(columns={"Count": "gene_a_count"})
+    gene_b_counts = gene_b_counts.rename(columns={"Count": "gene_b_count"})
+
+    try:
+        annotations = _prepare_annotation(sel_type)
+    except FileNotFoundError:
+        return (
+            jsonify(
+                error=(
+                    "Annotation data file not found. "
+                    "Set DATA_DIR to the directory containing anno_data.parquet."
+                )
+            ),
+            500,
+        )
+    except Exception as exc:
+        return jsonify(error=f"Unable to load annotation data: {exc}"), 500
+
+    annotations = annotations.copy()
+    annotations["Sample"] = annotations["SegmentDisplayName"].astype(str)
+
+    category_column = CATEGORY_COLUMN_MAP.get(category_key)
+    summary_detail_values = detail_values.copy()
+    if category_column:
+        annotations = annotations.dropna(subset=[category_column])
+        if detail_values:
+            if "*" in detail_values:
+                detail_values = []
+                summary_detail_values = (
+                    annotations[category_column].dropna().unique().tolist()
+                )
+            if detail_values:
+                filter_values = set(detail_values)
+                if category_column == "Diagnosis" and "STIC" in filter_values:
+                    filter_values.add("STICL")
+                annotations = annotations[
+                    annotations[category_column].isin(filter_values)
+                ]
+
+    if annotations.empty:
+        return (
+            jsonify(error="No samples available after applying the selected filters."),
+            404,
+        )
+
+    sample_frame = annotations[["Sample"]].drop_duplicates()
+    merged = sample_frame.merge(gene_a_counts, on="Sample", how="inner").merge(
+        gene_b_counts, on="Sample", how="inner"
+    )
+    merged = merged.dropna(subset=["gene_a_count", "gene_b_count"])
+
+    if merged.empty:
+        return jsonify(error="No overlapping samples for the selected genes."), 404
+
+    merged = merged.drop_duplicates(subset=["Sample"])
+
+    sample_count = len(merged)
+    if sample_count < 3:
+        return (
+            jsonify(
+                error="At least three overlapping samples are required for correlation."
+            ),
+            400,
+        )
+
+    x = merged["gene_a_count"].astype(float).to_numpy()
+    y = merged["gene_b_count"].astype(float).to_numpy()
+
+    try:
+        r_value, p_value = pearsonr(x, y)
+    except ValueError as exc:
+        return jsonify(error=f"Unable to compute correlation: {exc}"), 400
+
+    slope = intercept = None
+    x_line = y_line = None
+    if np.unique(x).size >= 2:
+        slope, intercept = np.polyfit(x, y, 1)
+        x_line = np.linspace(x.min(), x.max(), 100)
+        y_line = slope * x_line + intercept
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.scatter(
+        x,
+        y,
+        color="#3b82f6",
+        edgecolors="#ffffff",
+        linewidths=0.6,
+        alpha=0.8,
+        s=36,
+    )
+    if x_line is not None and y_line is not None:
+        ax.plot(x_line, y_line, color="#ef4444", linewidth=1.6)
+
+    ax.set_xlabel(f"{gene_a} normalized count")
+    ax.set_ylabel(f"{gene_b} normalized count")
+    ax.set_title(f"{gene_a} - {gene_b} correlation")
+    ax.grid(alpha=0.3, linestyle="--", linewidth=0.5)
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plot_b64 = base64.b64encode(buf.getvalue()).decode()
+    plt.close(fig)
+
+    stats_text = f"Pearson r = {r_value:.3f}, p = {p_value:.3e} (n = {sample_count})"
+
+    filter_parts: list[str] = [f"Type: {sel_type.title()}"]
+    if category_column:
+        category_label = CATEGORY_LABEL_MAP.get(category_column, category_column)
+        display_values: list[str] = []
+        seen_display: set[str] = set()
+        for value in summary_detail_values:
+            display_value = value
+            if category_column == "Diagnosis" and value in {"STIC", "STICL"}:
+                display_value = "STIC"
+            if display_value and display_value not in seen_display:
+                seen_display.add(display_value)
+                display_values.append(display_value)
+
+        if display_values:
+            filter_parts.append(f"{category_label}: {', '.join(display_values)}")
+        else:
+            filter_parts.append(category_label)
+    filter_summary = "; ".join(filter_parts)
+
+    response = {
+        "plot_url": f"data:image/png;base64,{plot_b64}",
+        "stats_text": stats_text,
+        "sample_count": sample_count,
+        "summary": filter_summary,
+    }
     return jsonify(response)
 
 

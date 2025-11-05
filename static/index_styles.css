@@ -61,6 +61,18 @@ form {
     width: 100%;
 }
 
+.gene-input-line .gene-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 120px;
+    max-width: 100%;
+}
+
+.gene-input-line input[type="text"] {
+    width: 100%;
+}
+
 label {
     font-weight: bold;
 }
@@ -95,6 +107,41 @@ label {
 
 .gene-input-line {
     margin-left: 0;
+}
+
+#plot,
+#additionalPlot,
+#selectionPlot,
+#correlationPlot,
+#correlationResult {
+    max-width: 640px;
+    width: 100%;
+}
+
+#plot img,
+#additionalPlot img,
+#selectionPlot img,
+#correlationPlot img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.correlation-stats {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #333;
+}
+
+.correlation-stats .stat-line {
+    display: block;
+    line-height: 1.45;
+}
+
+.correlation-image {
+    max-width: 640px;
+    width: 100%;
+    height: auto;
 }
 
 .multi-select {

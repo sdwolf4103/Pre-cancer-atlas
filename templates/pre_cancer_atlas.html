@@ -7,7 +7,7 @@
 
 </head>
 <body>
-    <h1>Pre-cancer Atlas</h1>
+    <h1>Ovarian Cancer Pre-cancer Atlas</h1>
 
     <div class="view-toggle">
         <p>Select the type of visualization you would like to explore:</p>
@@ -76,37 +76,49 @@
             </div>
 
             <div class="form-field hidden detail-field" id="categoryDetailWrapper">
-                <span class="detail-label">Select Detail(s):</span>
+                <span class="detail-label">Select group(s):</span>
                 <details class="multi-select" id="categoryDetailDropdown">
-                    <summary id="categoryDetailSummary">Select detail(s)</summary>
+                    <summary id="categoryDetailSummary">Select group(s)</summary>
                     <div id="categoryDetailOptions" class="multi-select-options"></div>
                 </details>
             </div>
 
             <div class="form-field gene-input-line">
                 <label for="geneA">Enter Gene A:</label>
-                <input
-                    type="text"
-                    id="geneA"
-                    name="geneA"
-                    placeholder="Enter first gene"
-                    autocomplete="off"
-                    required>
+                <div class="gene-input-wrapper">
+                    <input
+                        type="text"
+                        id="geneA"
+                        name="geneA"
+                        placeholder="Enter first gene"
+                        autocomplete="off"
+                        required>
+                    <div id="geneA-suggestions" class="gene-suggestions hidden"></div>
+                </div>
             </div>
 
             <div class="form-field gene-input-line">
                 <label for="geneB">Enter Gene B:</label>
-                <input
-                    type="text"
-                    id="geneB"
-                    name="geneB"
-                    placeholder="Enter second gene"
-                    autocomplete="off"
-                    required>
+                <div class="gene-input-wrapper">
+                    <input
+                        type="text"
+                        id="geneB"
+                        name="geneB"
+                        placeholder="Enter second gene"
+                        autocomplete="off"
+                        required>
+                    <div id="geneB-suggestions" class="gene-suggestions hidden"></div>
+                </div>
             </div>
 
             <button type="submit" class="form-submit">Generate Correlation</button>
         </form>
+
+        <div id="correlationResult" class="hidden">
+            <div id="correlationPlot"></div>
+            <div id="correlationStats" class="correlation-stats"></div>
+        </div>
+        <div id="correlationError" style="color: red;"></div>
     </section>
 
     <div id="plot"></div>
@@ -118,15 +130,133 @@
         const viewRadios   = document.querySelectorAll('input[name="view-mode"]');
         const expressionSection = document.getElementById("expressionSection");
         const correlationSection = document.getElementById("correlationSection");
-        const geneInput    = document.getElementById("gene");
+        const geneInput = document.getElementById("gene");
         const geneSuggestions = document.getElementById("gene-suggestions");
-        let geneController = null;
+        const geneAInput = document.getElementById("geneA");
+        const geneASuggestions = document.getElementById("geneA-suggestions");
+        const geneBInput = document.getElementById("geneB");
+        const geneBSuggestions = document.getElementById("geneB-suggestions");
 
         const categorySelect  = document.getElementById("corCategory");
         const categoryDetailWrapper = document.getElementById("categoryDetailWrapper");
         const categoryDetailDropdown = document.getElementById("categoryDetailDropdown");
         const categoryDetailOptions = document.getElementById("categoryDetailOptions");
         const categoryDetailSummary = document.getElementById("categoryDetailSummary");
+        const correlationForm = document.getElementById("correlationForm");
+        const correlationResult = document.getElementById("correlationResult");
+        const correlationPlotDiv = document.getElementById("correlationPlot");
+        const correlationStatsDiv = document.getElementById("correlationStats");
+        const correlationError = document.getElementById("correlationError");
+
+        function setupGeneAutocomplete(inputElement, suggestionElement) {
+          if (!inputElement || !suggestionElement) {
+            return;
+          }
+
+          const normalize = value => (value || "").trim().toUpperCase();
+          let controller = null;
+
+          const clear = () => {
+            suggestionElement.innerHTML = "";
+            suggestionElement.classList.add("hidden");
+          };
+
+          const show = names => {
+            suggestionElement.innerHTML = "";
+            if (!names || names.length === 0) {
+              const empty = document.createElement("div");
+              empty.className = "gene-suggestion empty";
+              empty.textContent = "No matching genes";
+              suggestionElement.appendChild(empty);
+            } else {
+              names.forEach(name => {
+                const option = document.createElement("button");
+                option.type = "button";
+                option.className = "gene-suggestion";
+                option.textContent = name;
+                option.addEventListener("mousedown", event => {
+                  event.preventDefault();
+                  inputElement.value = name;
+                  clear();
+                });
+                suggestionElement.appendChild(option);
+              });
+            }
+            suggestionElement.classList.remove("hidden");
+          };
+
+          const update = term => {
+            if (controller) {
+              controller.abort();
+              controller = null;
+            }
+
+            if (!term || term.length < 1) {
+              clear();
+              return;
+            }
+
+            const newController =
+              typeof AbortController !== "undefined" ? new AbortController() : null;
+            controller = newController;
+            const fetchOptions = newController ? { signal: newController.signal } : {};
+
+            fetch(`/genes?q=${encodeURIComponent(term)}`, fetchOptions)
+              .then(res => (res.ok ? res.json() : []))
+              .then(names => {
+                show(names);
+                controller = null;
+              })
+              .catch(err => {
+                if (!err || err.name !== "AbortError") {
+                  console.error("Gene suggestion lookup failed", err);
+                }
+                controller = null;
+                clear();
+              });
+          };
+
+          inputElement.addEventListener("input", event => {
+            const value = normalize(event.target.value);
+            if (event.target.value !== value) {
+              event.target.value = value;
+            }
+            update(value);
+          });
+
+          inputElement.addEventListener("focus", event => {
+            const value = normalize(event.target.value);
+            if (event.target.value !== value) {
+              event.target.value = value;
+            }
+            update(value);
+          });
+
+          inputElement.addEventListener("blur", () => {
+            setTimeout(() => {
+              clear();
+            }, 120);
+          });
+        }
+
+        setupGeneAutocomplete(geneInput, geneSuggestions);
+        setupGeneAutocomplete(geneAInput, geneASuggestions);
+        setupGeneAutocomplete(geneBInput, geneBSuggestions);
+
+        function resetCorrelationOutput(clearError = true) {
+          if (correlationPlotDiv) {
+            correlationPlotDiv.innerHTML = "";
+          }
+          if (correlationStatsDiv) {
+            correlationStatsDiv.textContent = "";
+          }
+          if (correlationResult) {
+            correlationResult.classList.add("hidden");
+          }
+          if (clearError && correlationError) {
+            correlationError.textContent = "";
+          }
+        }
 
         const categoryDetails = {
           molecular: [
@@ -174,12 +304,23 @@
           if (activeMode === "expression") {
             expressionSection.classList.remove("hidden");
             correlationSection.classList.add("hidden");
+            resetCorrelationOutput(true);
           } else if (activeMode === "correlation") {
             correlationSection.classList.remove("hidden");
             expressionSection.classList.add("hidden");
           } else {
             expressionSection.classList.add("hidden");
             correlationSection.classList.add("hidden");
+            resetCorrelationOutput(true);
+          }
+
+          if (activeMode !== "expression") {
+            const plotImg = document.getElementById("plot");
+            const additionalImg = document.getElementById("additionalPlot");
+            const selectionImg = document.getElementById("selectionPlot");
+            if (plotImg) plotImg.innerHTML = "";
+            if (additionalImg) additionalImg.innerHTML = "";
+            if (selectionImg) selectionImg.innerHTML = "";
           }
         }
 
@@ -190,29 +331,129 @@
         updateViewMode();
 
         function resetCategoryDetail() {
+
           categoryDetailOptions.innerHTML = "";
-          categoryDetailSummary.textContent = "Select detail(s)";
+          categoryDetailSummary.textContent = "Select group(s)";
           if (categoryDetailDropdown) {
             categoryDetailDropdown.open = false;
           }
           categoryDetailWrapper.classList.add("hidden");
         }
 
-        function updateCategoryDetailSummary() {
-          const checked = Array.from(
+        function getSelectedDetailInputs() {
+          if (!categoryDetailOptions) {
+            return [];
+          }
+          return Array.from(
             categoryDetailOptions.querySelectorAll('input[type="checkbox"]:checked')
-          ).map(input => input.dataset.label || input.value);
-          if (checked.length === 0) {
-            categoryDetailSummary.textContent = "Select detail(s)";
-          } else if (checked.length <= 2) {
-            categoryDetailSummary.textContent = checked.join(", ");
+          );
+        }
+
+        function getSelectedDetailValues() {
+          return getSelectedDetailInputs()
+            .filter(input => input.name === "category_detail")
+            .map(input => input.value);
+        }
+
+        function syncSelectAllState() {
+          if (!categoryDetailOptions) {
+            return;
+          }
+          const selectAllCheckbox = categoryDetailOptions.querySelector(
+            'input[type="checkbox"][name="category_detail_all"]'
+          );
+          if (!selectAllCheckbox) {
+            return;
+          }
+          const detailCheckboxes = categoryDetailOptions.querySelectorAll(
+            'input[type="checkbox"][name="category_detail"]'
+          );
+          if (!detailCheckboxes.length) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+            return;
+          }
+          const checkedCount = Array.from(detailCheckboxes).filter(cb => cb.checked).length;
+          selectAllCheckbox.checked = checkedCount === detailCheckboxes.length;
+          selectAllCheckbox.indeterminate =
+            checkedCount > 0 && checkedCount < detailCheckboxes.length;
+        }
+
+        function updateCategoryDetailSummary() {
+          const checkedInputs = getSelectedDetailInputs();
+          const selectAllCheckbox = categoryDetailOptions
+            ? categoryDetailOptions.querySelector('input[type="checkbox"][name="category_detail_all"]')
+            : null;
+          const selectAllChecked = selectAllCheckbox ? selectAllCheckbox.checked : false;
+
+          const detailInputs = checkedInputs.filter(
+            input => input.name === "category_detail"
+          );
+          if (selectAllChecked && detailInputs.length > 0) {
+            categoryDetailSummary.textContent = "All selected";
+            return;
+          }
+
+          const labels = detailInputs.map(
+            input => input.dataset.label || input.value
+          );
+          if (labels.length === 0) {
+            categoryDetailSummary.textContent = "Select group(s)";
+          } else if (labels.length <= 2) {
+            categoryDetailSummary.textContent = labels.join(", ");
           } else {
-            categoryDetailSummary.textContent = `${checked.length} selected`;
+            categoryDetailSummary.textContent = `${labels.length} selected`;
           }
         }
 
         function populateCategoryDetail(items) {
+          const previousInputs = getSelectedDetailInputs();
+          const previouslySelected = new Set(
+            previousInputs
+              .filter(input => input.name === "category_detail")
+              .map(input => input.value)
+          );
+          const previousSelectAll = previousInputs.some(
+            input =>
+              input.name === "category_detail_all" &&
+              typeof input.checked === "boolean" &&
+              input.checked
+          );
+
           categoryDetailOptions.innerHTML = "";
+          let selectAllCheckbox = null;
+
+          if (items.length > 0) {
+            const selectAllLabel = document.createElement("label");
+            selectAllLabel.className = "multi-option select-all-option";
+
+            selectAllCheckbox = document.createElement("input");
+            selectAllCheckbox.type = "checkbox";
+            selectAllCheckbox.name = "category_detail_all";
+            selectAllCheckbox.value = "*";
+            selectAllCheckbox.dataset.label = "Select all";
+            selectAllCheckbox.checked =
+              previousSelectAll || previouslySelected.size === items.length;
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.addEventListener("change", event => {
+              const checked = event.target.checked;
+              categoryDetailOptions
+                .querySelectorAll('input[type="checkbox"][name="category_detail"]')
+                .forEach(cb => {
+                  cb.checked = checked;
+                });
+              updateCategoryDetailSummary();
+              syncSelectAllState();
+            });
+
+            const allSpan = document.createElement("span");
+            allSpan.textContent = "Select all";
+
+            selectAllLabel.appendChild(selectAllCheckbox);
+            selectAllLabel.appendChild(allSpan);
+            categoryDetailOptions.appendChild(selectAllLabel);
+          }
+
           items.forEach(item => {
             const optionLabel = document.createElement("label");
             optionLabel.className = "multi-option";
@@ -222,7 +463,16 @@
             checkbox.name = "category_detail";
             checkbox.value = item.value;
             checkbox.dataset.label = item.label;
-            checkbox.addEventListener("change", updateCategoryDetailSummary);
+            if (
+              (selectAllCheckbox && selectAllCheckbox.checked) ||
+              previouslySelected.has(item.value)
+            ) {
+              checkbox.checked = true;
+            }
+            checkbox.addEventListener("change", () => {
+              updateCategoryDetailSummary();
+              syncSelectAllState();
+            });
 
             const span = document.createElement("span");
             span.textContent = item.label;
@@ -231,6 +481,8 @@
             optionLabel.appendChild(span);
             categoryDetailOptions.appendChild(optionLabel);
           });
+
+          syncSelectAllState();
           updateCategoryDetailSummary();
           if (categoryDetailDropdown) {
             categoryDetailDropdown.open = false;
@@ -245,6 +497,7 @@
           } else {
             resetCategoryDetail();
           }
+          resetCorrelationOutput(false);
         }
 
         categorySelect.addEventListener("change", refreshCategoryDetail);
@@ -263,93 +516,100 @@
         });
 
         function generateCorrelation() {
-          // Placeholder until correlation endpoint is wired up.
-          document.getElementById("error").innerText =
-            "Correlation view is coming soon.";
-          return false;
-        }
-
-        function clearGeneSuggestions() {
-          geneSuggestions.innerHTML = "";
-          geneSuggestions.classList.add("hidden");
-        }
-
-        function showGeneSuggestions(names) {
-          geneSuggestions.innerHTML = "";
-          if (!names || names.length === 0) {
-            const empty = document.createElement("div");
-            empty.className = "gene-suggestion empty";
-            empty.textContent = "No matching genes";
-            geneSuggestions.appendChild(empty);
-          } else {
-            names.forEach(name => {
-              const option = document.createElement("button");
-              option.type = "button";
-              option.className = "gene-suggestion";
-              option.textContent = name;
-              option.addEventListener("mousedown", event => {
-                event.preventDefault();
-                geneInput.value = name;
-                clearGeneSuggestions();
-              });
-              geneSuggestions.appendChild(option);
-            });
-          }
-          geneSuggestions.classList.remove("hidden");
-        }
-
-        function updateGeneSuggestions(term) {
-          if (geneController) {
-            geneController.abort();
-            geneController = null;
+          if (!geneAInput || !geneBInput) {
+            return false;
           }
 
-          if (!term || term.length < 1) {
-            clearGeneSuggestions();
-            return;
+          const geneAValue = (geneAInput.value || "").trim().toUpperCase();
+          const geneBValue = (geneBInput.value || "").trim().toUpperCase();
+          geneAInput.value = geneAValue;
+          geneBInput.value = geneBValue;
+
+          if (!geneAValue || !geneBValue) {
+            correlationError.textContent = "Please enter both gene names.";
+            return false;
           }
 
-          const controller =
-            typeof AbortController !== "undefined" ? new AbortController() : null;
-          geneController = controller;
+          const formData = new FormData();
+          formData.append("geneA", geneAValue);
+          formData.append("geneB", geneBValue);
+          formData.append("type", "epithelium");
 
-          const fetchOptions = controller ? { signal: controller.signal } : {};
-          fetch(`/genes?q=${encodeURIComponent(term)}`, fetchOptions)
-            .then(res => (res.ok ? res.json() : []))
-            .then(names => {
-              showGeneSuggestions(names);
-              geneController = null;
+          const categoryValue = categorySelect ? categorySelect.value : "";
+          if (categoryValue) {
+            formData.append("category", categoryValue);
+          }
+
+          const detailValues = getSelectedDetailValues();
+          const requiresDetail =
+            categoryDetailWrapper &&
+            !categoryDetailWrapper.classList.contains("hidden") &&
+            detailValues.length === 0;
+
+          if (requiresDetail) {
+            correlationError.textContent =
+              "Please select at least one detail option.";
+            return false;
+          }
+
+          detailValues.forEach(value => formData.append("category_detail", value));
+
+          resetCorrelationOutput(true);
+          if (categoryDetailDropdown) {
+            categoryDetailDropdown.open = false;
+          }
+
+          fetch("/pre_cancer_correlation", {
+            method: "POST",
+            body: formData
+          })
+            .then(res => {
+              if (res.ok) {
+                return res.json();
+              }
+              return res
+                .json()
+                .catch(() => ({}))
+                .then(body => {
+                  const message =
+                    body && typeof body.error === "string"
+                      ? body.error
+                      : "Unable to generate correlation.";
+                  throw new Error(message);
+                });
+            })
+            .then(data => {
+              if (!data || !data.plot_url) {
+                throw new Error("Correlation plot is unavailable.");
+              }
+              correlationPlotDiv.innerHTML =
+                `<img src="${data.plot_url}" alt="Correlation plot" class="correlation-image">`;
+              const fragments = [];
+              if (data.stats_text) {
+                fragments.push(`<span class="stat-line">${data.stats_text}</span>`);
+              }
+              if (data.summary) {
+                const summaryParts = (data.summary || "").split(";");
+                summaryParts
+                  .map(part => part.trim())
+                  .filter(Boolean)
+                  .forEach(part => {
+                    fragments.push(`<span class="stat-line">${part}</span>`);
+                  });
+              }
+              correlationStatsDiv.innerHTML = fragments.join("");
+              correlationResult.classList.remove("hidden");
+              correlationError.textContent = "";
             })
             .catch(err => {
-              if (!err || err.name !== "AbortError") {
-                console.error("Gene suggestion lookup failed", err);
-              }
-              geneController = null;
-              clearGeneSuggestions();
+              correlationError.textContent =
+                err && err.message
+                  ? err.message
+                  : "Unable to generate correlation.";
             });
+
+          return false;
         }
-
-        geneInput.addEventListener("input", event => {
-          const value = (event.target.value || "").trim().toUpperCase();
-          if (event.target.value !== value) {
-            event.target.value = value;
-          }
-          updateGeneSuggestions(value);
-        });
-
-        geneInput.addEventListener("focus", event => {
-          const value = (event.target.value || "").trim().toUpperCase();
-          if (event.target.value !== value) {
-            event.target.value = value;
-          }
-          updateGeneSuggestions(value);
-        });
-
-        geneInput.addEventListener("blur", () => {
-          setTimeout(() => {
-            clearGeneSuggestions();
-          }, 120);
-        });
 
         function generatePlot() {
           const form      = document.getElementById("plotForm");
