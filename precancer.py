@@ -465,12 +465,13 @@ def plot():
     ]
     category_positions = {cat: idx + 1 for idx, cat in enumerate(present_categories)}
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(8, 6))
     plot_data.boxplot(
         column="Count",
         by="Molecular_Subtype",
         ax=ax,
         flierprops={"marker": ""},
+        grid=False,
     )
 
     jitter_strength = 0.06
@@ -481,7 +482,7 @@ def plot():
             category_positions[subtype], jitter_strength, size=mask.sum()
         )
         y = plot_data.loc[mask, "Count"]
-        ax.scatter(x, y, color="black", alpha=0.7, s=point_size)
+        ax.scatter(x, y, color="black", alpha=0.6, s=point_size)
 
     nft_counts = plot_data.loc[plot_data["Molecular_Subtype"] == "NFT", "Count"]
     if len(nft_counts) >= 2:
@@ -519,11 +520,12 @@ def plot():
     padding = max((y_max - y_min) * 0.1, 0.1 * max(abs(y_max), 1))
     ax.set_ylim(y_min - padding, y_max + padding)
 
-    plt.title(f"Boxplot of {gene} by Molecular Subtype")
-    plt.suptitle("")
-    ax.set_xlabel("Molecular subtype")
-    ax.set_ylabel("Normalized Gene Count")
-    ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax.set_title(f"{gene} Expression by Molecular Subtypes", fontsize=14)
+    fig.suptitle("")
+    ax.set_xlabel("Molecular subtype", fontsize=12)
+    ax.set_ylabel("Normalized Gene Count", fontsize=12)
+    ax.grid(axis="y", color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax.tick_params(axis="both", labelsize=10)
     ax.tick_params(axis="x", labelrotation=45)
     for tick in ax.get_xticklabels():
         tick.set_ha("right")
@@ -561,12 +563,13 @@ def plot():
     )
     diagnosis_data = diagnosis_data.dropna(subset=["Diagnosis_Grouped"])
 
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
+    fig2, ax2 = plt.subplots(figsize=(8, 6))
     diagnosis_data.boxplot(
         column="Count",
         by="Diagnosis_Grouped",
         ax=ax2,
         flierprops={"marker": ""},
+        grid=False,
     )
 
     diag_present = [
@@ -580,7 +583,7 @@ def plot():
         mask = diagnosis_data["Diagnosis_Grouped"] == subtype
         x = np.random.normal(diag_positions[subtype], jitter_strength, size=mask.sum())
         y = diagnosis_data.loc[mask, "Count"]
-        ax2.scatter(x, y, color="black", alpha=0.7, s=point_size)
+        ax2.scatter(x, y, color="black", alpha=0.6, s=point_size)
 
     nft_diag_counts = diagnosis_data.loc[
         diagnosis_data["Diagnosis_Grouped"] == "NFT", "Count"
@@ -620,11 +623,12 @@ def plot():
     diag_padding = max((diag_y_max - diag_y_min) * 0.1, 0.1 * max(abs(diag_y_max), 1))
     ax2.set_ylim(diag_y_min - diag_padding, diag_y_max + diag_padding)
 
-    ax2.set_title("Boxplot of Pathologic Diagnosis")
-    plt.suptitle("")
-    ax2.set_xlabel("Pathologic diagnosis")
-    ax2.set_ylabel("Normalized Gene Count")
-    ax2.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax2.set_title(f"{gene} Expression by Pathologic Diagnosis", fontsize=14)
+    fig2.suptitle("")
+    ax2.set_xlabel("Pathologic diagnosis", fontsize=12)
+    ax2.set_ylabel("Normalized Gene Count", fontsize=12)
+    ax2.grid(axis="y", color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax2.tick_params(axis="both", labelsize=10)
     ax2.tick_params(axis="x", labelrotation=45)
     for tick in ax2.get_xticklabels():
         tick.set_ha("right")
@@ -645,12 +649,13 @@ def plot():
             right_on="SegmentDisplayName",
         ).dropna(subset=[selection])
         if not selection_data.empty:
-            fig3, ax3 = plt.subplots(figsize=(8, 5))
+            fig3, ax3 = plt.subplots(figsize=(8, 6))
             selection_data.boxplot(
                 column="Count",
                 by=selection,
                 ax=ax3,
                 flierprops={"marker": ""},
+                grid=False,
             )
 
             cats = [lbl.get_text() for lbl in ax3.get_xticklabels()]
@@ -658,13 +663,16 @@ def plot():
                 mask = selection_data[selection] == cat
                 x = np.random.normal(idx, jitter_strength, size=mask.sum())
                 y = selection_data.loc[mask, "Count"]
-                ax3.scatter(x, y, color="black", alpha=0.7, s=point_size)
+                ax3.scatter(x, y, color="black", alpha=0.6, s=point_size)
 
-            ax3.set_title(f"Boxplot of {gene} by {selection.title()}")
-            plt.suptitle("")
-            ax3.set_xlabel(selection)
-            ax3.set_ylabel("Normalized Gene Count")
-            ax3.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+            ax3.set_title(
+                f"{gene} Expression by {selection.title()}", fontsize=14
+            )
+            fig3.suptitle("")
+            ax3.set_xlabel(selection, fontsize=12)
+            ax3.set_ylabel("Normalized Gene Count", fontsize=12)
+            ax3.grid(axis="y", color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+            ax3.tick_params(axis="both", labelsize=10)
             ax3.tick_params(axis="x", labelrotation=45)
             for tick in ax3.get_xticklabels():
                 tick.set_ha("right")
@@ -822,23 +830,24 @@ def correlation():
         x_line = np.linspace(x.min(), x.max(), 100)
         y_line = slope * x_line + intercept
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(8, 6))
     ax.scatter(
         x,
         y,
-        color="#3b82f6",
+        color="#1f3b70",
         edgecolors="#ffffff",
-        linewidths=0.6,
-        alpha=0.8,
-        s=36,
+        linewidths=0.5,
+        alpha=0.75,
+        s=54,
     )
     if x_line is not None and y_line is not None:
-        ax.plot(x_line, y_line, color="#ef4444", linewidth=1.6)
+        ax.plot(x_line, y_line, color="#8b1a1a", linewidth=1.6)
 
-    ax.set_xlabel(f"{gene_a} normalized count")
-    ax.set_ylabel(f"{gene_b} normalized count")
-    ax.set_title(f"{gene_a} - {gene_b} correlation")
-    ax.grid(alpha=0.3, linestyle="--", linewidth=0.5)
+    ax.set_xlabel(f"{gene_a} normalized count", fontsize=12)
+    ax.set_ylabel(f"{gene_b} normalized count", fontsize=12)
+    ax.set_title(f"{gene_a} - {gene_b} correlation", fontsize=14)
+    ax.grid(axis="both", color="gray", linestyle="--", linewidth=0.5, alpha=0.3)
+    ax.tick_params(axis="both", labelsize=10)
     fig.tight_layout()
 
     buf = io.BytesIO()
