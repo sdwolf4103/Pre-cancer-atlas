@@ -13,8 +13,27 @@
 
 </head>
 <body>
+<header class="site-hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+        <h1 class="page-title">
+            <a
+                href="https://gynecologycancer.org/"
+                class="logo-link"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                <img
+                    src="{{ url_for('static', filename='img/Logo_1.png') }}"
+                    alt="Ovarian Pre-cancer Atlas logo"
+                    class="site-logo"
+                >
+            </a>
+            Ovarian Pre-cancer Atlas
+        </h1>
+    </div>
+</header>
 <main class="page-content">
-    <h1>Ovarian Pre-cancer Atlas</h1>
 
     <div class="view-toggle">
         <p>Select the type of visualization you would like to explore:</p>
@@ -134,6 +153,25 @@
     <div id="selectionPlot"></div>
     <div id="error" style="color: red;"></div>
 </main>
+
+    <details class="about-section">
+        <summary>
+            <span class="summary-label">About Us</span>
+        </summary>
+        <div class="about-content">
+            <p>
+                The Ovarian Pre-cancer Atlas is developed by the <a href="https://gynecologycancer.org/" target="_blank" rel="noopener noreferrer">Shih Laboratory at Johns Hopkins University</a> to share spatial transcriptomic insights on precursor lesions of ovarian cancer. Our goal
+                is to provide the research community with intuitive tools to explore gene expression
+                patterns across the fallopian tube epithelium and associated precancerous lesions.
+            </p>
+            <p>
+                For website inquiries, please email
+                <a href="mailto:precanceratlas@gmail.com">precanceratlas@gmail.com</a>.
+                For collaborations or research questions, contact
+                <a href="mailto:shihie@yahoo.com">shihie@yahoo.com</a>.
+            </p>
+        </div>
+    </details>
 
     <footer class="site-disclaimer">
         <p>The data presented on this website are derived from analyses described in the manuscript
