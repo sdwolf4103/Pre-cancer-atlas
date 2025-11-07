@@ -1,14 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Ovarian Cancer Pre-cancer Atlas</title>
+    <title>Ovarian Pre-cancer Atlas</title>
+    <meta name="title" content="Ovarian Pre-Cancer Atlas – Spatial Transcriptomic Explorer">
+    <meta name="description" content="Interactive platform for exploring ovarian precursor lesions and integrated spatial transcriptomic data.">
+    <meta name="keywords" content="ovarian cancer, STIC, STIL, fallopian tube, spatial transcriptomics, GeoMx, precursor lesions, HGSC, high-grade serous carcinoma, gene expression, molecular subtypes">
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="Shih Lab, Johns Hopkins University">
+    <link rel="canonical" href="https://ovarian-precancer-atlas.gynecologycancer.org/">
     <link rel="stylesheet" href="{{ url_for('static', filename='index_styles.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
 </head>
 <body>
 <main class="page-content">
-    <h1>Ovarian Cancer Pre-cancer Atlas</h1>
+    <h1>Ovarian Pre-cancer Atlas</h1>
 
     <div class="view-toggle">
         <p>Select the type of visualization you would like to explore:</p>
@@ -135,6 +141,12 @@
         If you use these data for your own research or publication, please cite: [citation to be added].</p>
 
         <p>All visualizations and analyses shown here are based on mRNA expression data generated using the NanoString GeoMx platform. These results are provided for research purposes only. All biological and clinical interpretations are not endorsed by the authors or affiliated institutions.</p>
+
+        <p>
+            The flat BLAD morphology category follows the histologic criteria described in
+            <em>Interception of Serous Tubal Intraepithelial Carcinoma: Identifying Precursors of Ovarian High-Grade Serous Carcinoma</em>,
+            PMC10930374.
+        </p>
 
         <p>All data used in the visualizations are fully de-identified and were analyzed in compliance with Institutional Review Board (IRB)–approved protocols.</p>
     </footer>

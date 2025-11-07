@@ -20,7 +20,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from scipy.stats import ttest_ind, pearsonr
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
 HERE = Path(__file__).resolve().parent
@@ -343,6 +343,16 @@ def _prepare_annotation(sel_type: str | None) -> pd.DataFrame:
 @app.route("/")
 def home():
     return render_template("pre_cancer_atlas.html")
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    return send_from_directory(STATIC_DIR, "robots.txt", mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    return send_from_directory(STATIC_DIR, "sitemap.xml", mimetype="application/xml")
 
 
 @app.route("/genes")
