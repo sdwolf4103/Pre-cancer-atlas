@@ -9,6 +9,9 @@
     <meta name="author" content="Shih Lab, Johns Hopkins University">
     <meta name="msvalidate.01" content="F0782A13CB8C3F8B1598CA131B513A35">
     <link rel="canonical" href="https://ovarian-precancer-atlas.gynecologycancer.org/">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600&family=Montserrat:wght@600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='index_styles.css') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/Logo_1_no_words.png') }}">
 
@@ -17,7 +20,7 @@
 <header class="site-hero">
     <div class="hero-bg"></div>
     <div class="hero-content">
-        <h1 class="page-title">
+        <div class="hero-heading">
             <a
                 href="https://gynecologycancer.org/"
                 class="logo-link"
@@ -30,26 +33,80 @@
                     class="site-logo"
                 >
             </a>
-            Ovarian Pre-cancer Atlas
-        </h1>
+            <div class="hero-text">
+                <h1 class="page-title">Ovarian Pre-cancer Atlas</h1>
+                <p class="page-subtitle">An interactive atlas of gene expression across fallopian tube epithelium and precursor lesions derived from NanoString GeoMx spatial transcriptomic data.</p>
+                <nav class="primary-nav" aria-label="Primary navigation">
+                    <ul class="nav-list">
+                        <li><a class="nav-link" href="#home" data-view-target="home">Home</a></li>
+                        <li class="nav-item--has-dropdown">
+                            <button class="nav-link dropdown-toggle" type="button" aria-haspopup="true" aria-expanded="false">
+                                Gene Explore
+                            </button>
+                            <ul class="nav-dropdown">
+                                <li><a class="nav-link" href="#expressionSection" data-view-target="expression">Gene Expression</a></li>
+                                <li><a class="nav-link" href="#correlationSection" data-view-target="correlation">Gene Correlation</a></li>
+                            </ul>
+                        </li>
+                        <li><a class="nav-link" href="#citation" data-view-target="citation">How to Cite</a></li>
+                        <li><a class="nav-link" href="#about" data-view-target="about">About Us</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
     </div>
 </header>
-<main class="page-content">
+<main class="page-content page-background">
 
-    <div class="view-toggle">
-        <p>Select the type of visualization you would like to explore:</p>
-        <label>
-            <input type="radio" name="view-mode" value="expression">
-            Gene expression boxplot
-        </label>
-        <label>
-            <input type="radio" name="view-mode" value="correlation">
-            Gene correlation
-        </label>
-    </div>
+    <section id="home" class="home-section">
+        <div class="home-intro">
+            <p>
+                The Ovarian Pre-cancer Atlas is developed by the
+                <a href="https://gynecologycancer.org/" target="_blank" rel="noopener noreferrer">Shih Laboratory at Johns Hopkins University</a>
+                to share spatial transcriptomic insights on precursor lesions of ovarian cancer. Our goal
+                is to provide the research community with intuitive tools to explore gene expression
+                patterns across the fallopian tube epithelium and associated precancerous lesions.
+            </p>
+            <p>
+                You may search genes of interest to inquire mRNA expression levels and compare them in normal
+                fallopian tube epithelium, high-grade serous carcinoma, and various types of precancerous lesions
+                including STIC and p53 signatures. In the forthcoming version, the integrated morphology, multi-omic
+                data, and relevant clinical information will be available.
+            </p>
+        </div>
+        <figure class="home-figure">
+            <img
+                src="{{ url_for('static', filename='img/STIC.png') }}"
+                alt="STIC illustration"
+            >
+            <figcaption>Illustration showing the stepwise transformation of fallopian tube epithelium: (top) p53 signature; (middle) transition to active STIC; (bottom) invasion leading to HGSC.</figcaption>
+        </figure>
+    </section>
+
+    <section class="expression-intro" data-view-section="expression">
+        <h2>Gene Expression across Ovarian Precancerous Lesions</h2>
+        <p>
+            Explore mRNA expression measured by NanoString GeoMx DSP across normal fallopian tube epithelium and precursor lesions, and high-grade serous carcinoma.
+        </p>
+        <details class="how-to-details">
+            <summary>💡 How to Use</summary>
+            <div class="how-to-panel">
+                <ol>
+                    <li><strong>Select Type:</strong> Choose Epithelium or Stroma to define the tissue compartment.</li>
+                    <li><strong>Enter Gene:</strong> Type an official gene symbol (e.g., SOX4, MMP7, CD74).</li>
+                    <li><strong>(Optional) Select Category:</strong> Add an additional plot to compare STIC separated by morphology category (Flat and BLAD).</li>
+                    <li><strong>Click Generate Plot:</strong> Boxplots will display expression levels across lesion groups.</li>
+                </ol>
+                <p class="how-to-note">
+                    <strong>Note on “*”:</strong> The asterisk marks groups whose group mean is above or below the NFT (normal fallopian tube epithelium)
+                    mean based on a simple reference comparison computed in Python. It is a visual cue only and does not indicate statistical significance
+                    (no p-value). For formal differential expression or significance testing, please use DESeq2 (or an equivalent method).
+                </p>
+            </div>
+        </details>
+    </section>
 
     <section id="expressionSection" class="hidden">
-        <p>Please enter a gene name and select a category if desired:</p>
         <form id="plotForm" onsubmit="generatePlot(); return false;">
             <div class="form-field">
                 <label for="type">Select Type:</label>
@@ -89,6 +146,24 @@
     </section>
 
     <section id="correlationSection" class="hidden">
+        <div class="correlation-intro">
+            <h2>Gene Correlation across Ovarian Precancerous Lesions</h2>
+            <p>
+                Explore the relationship between two genes across selected lesion groups using mRNA expression data
+                from NanoString GeoMx spatial transcriptomics.
+            </p>
+            <details class="how-to-details">
+                <summary>💡 How to Use</summary>
+                <div class="how-to-panel">
+                    <ol>
+                        <li><strong>Select Category:</strong> Choose a grouping variable (e.g., Diagnosis, Morphology category, or Molecular subtype).</li>
+                        <li><strong>Select Group(s):</strong> Choose one or multiple lesion groups to include in the correlation analysis.</li>
+                        <li><strong>Enter Gene A and Gene B:</strong> Input two official gene symbols (e.g., IGFBP2 and MMP7).</li>
+                        <li><strong>Click “Generate Correlation”:</strong> A scatter plot will display gene expression correlation across the selected groups.</li>
+                    </ol>
+                </div>
+            </details>
+        </div>
         <p>Please enter a category and two genes to view their correlation:</p>
         <form id="correlationForm" onsubmit="generateCorrelation(); return false;">
             <div class="form-field">
@@ -153,47 +228,57 @@
     <div id="additionalPlot"></div>
     <div id="selectionPlot"></div>
     <div id="error" style="color: red;"></div>
+
+    <section id="about" class="about-section hidden">
+        <h2>About Us</h2>
+        <p>We are from the JHU Ie-Ming Shih / Tian-Li Wang Lab.</p>
+        <p>
+            To learn more about our work, please visit
+            <a href="https://gynecologycancer.org/" target="_blank" rel="noopener noreferrer">gynecologycancer.org</a>.
+        </p>
+    </section>
+
+    <section id="contact" class="contact-section hidden">
+        <h2>Contact Us</h2>
+        <p>
+            For website inquiries, please email
+            <a href="mailto:precanceratlas@gmail.com">precanceratlas@gmail.com</a>.
+        </p>
+        <p>
+            For collaborations or research questions, contact
+            <a href="mailto:shihie@yahoo.com">shihie@yahoo.com</a>.
+        </p>
+    </section>
+
+    <section id="citation" class="citation-section hidden">
+        <h2>How to Cite</h2>
+        <p>
+            The data used for generating the plots on this website are derived from analyses described in the manuscript
+            <strong><span class="citation-link"><em>Integrated Spatial Analysis of Ovarian Precancerous Lesions</em>, Chang et al.</span></strong>.
+            If you use these data for your own research or publication, please cite: [citation to be added].
+        </p>
+        <p>
+            If you use the Flat or BLAD morphology categories, please cite
+            <strong><span class="citation-link"><em>Morphologic and Molecular Heterogeneity of High-grade Serous Carcinoma Precursor Lesions</em>, Chien et al.</span></strong>.
+        </p>
+    </section>
 </main>
 
-    <details class="about-section">
-        <summary>
-            <span class="summary-label">About Us</span>
-        </summary>
-        <div class="about-content">
-            <p>
-                The Ovarian Pre-cancer Atlas is developed by the <a href="https://gynecologycancer.org/" target="_blank" rel="noopener noreferrer">Shih Laboratory at Johns Hopkins University</a> to share spatial transcriptomic insights on precursor lesions of ovarian cancer. Our goal
-                is to provide the research community with intuitive tools to explore gene expression
-                patterns across the fallopian tube epithelium and associated precancerous lesions.
-            </p>
-            <p>
-                For website inquiries, please email
-                <a href="mailto:precanceratlas@gmail.com">precanceratlas@gmail.com</a>.
-                For collaborations or research questions, contact
-                <a href="mailto:shihie@yahoo.com">shihie@yahoo.com</a>.
-            </p>
-        </div>
-    </details>
-
-    <footer class="site-disclaimer">
-        <p>The data presented on this website are derived from analyses described in the manuscript
-        “Integrated Spatial Analysis of Ovarian Precancerous Lesions.”<br>
-        If you use these data for your own research or publication, please cite: [citation to be added].</p>
-
+    <footer class="site-disclaimer hidden" id="siteFooter">
         <p>All visualizations and analyses shown here are based on mRNA expression data generated using the NanoString GeoMx platform. These results are provided for research purposes only. All biological and clinical interpretations are not endorsed by the authors or affiliated institutions.</p>
-
-        <p>
-            The flat BLAD morphology category follows the histologic criteria described in
-            <em>Morphologic and Molecular Heterogeneity of High-grade Serous Carcinoma Precursor Lesions</em>,
-            Chien et al., PMC10930374.
-        </p>
 
         <p>All data used in the visualizations are fully de-identified and were analyzed in compliance with Institutional Review Board (IRB)–approved protocols.</p>
     </footer>
 
     <script>
-        const viewRadios   = document.querySelectorAll('input[name="view-mode"]');
+        const homeSection = document.getElementById("home");
         const expressionSection = document.getElementById("expressionSection");
         const correlationSection = document.getElementById("correlationSection");
+        const aboutSection = document.getElementById("about");
+        const contactSection = document.getElementById("contact");
+        const citationSection = document.getElementById("citation");
+        const expressionIntro = document.querySelector('[data-view-section="expression"]');
+        const viewToggleLinks = document.querySelectorAll("[data-view-target]");
         const geneInput = document.getElementById("gene");
         const geneSuggestions = document.getElementById("gene-suggestions");
         const geneAInput = document.getElementById("geneA");
@@ -211,6 +296,7 @@
         const correlationPlotDiv = document.getElementById("correlationPlot");
         const correlationStatsDiv = document.getElementById("correlationStats");
         const correlationError = document.getElementById("correlationError");
+        const siteFooter = document.getElementById("siteFooter");
         const generatePlotButton = document.getElementById("generatePlotButton");
         const generateCorrelationButton = document.getElementById(
           "generateCorrelationButton"
@@ -326,6 +412,119 @@
           }
         }
 
+        function clearExpressionPlots() {
+          const plotImg = document.getElementById("plot");
+          const additionalImg = document.getElementById("additionalPlot");
+          const selectionImg = document.getElementById("selectionPlot");
+          if (plotImg) plotImg.innerHTML = "";
+          if (additionalImg) additionalImg.innerHTML = "";
+          if (selectionImg) selectionImg.innerHTML = "";
+        }
+
+        function setViewMode(mode, { scrollIntoView = true } = {}) {
+          let normalized = "expression";
+          if (mode === "home") {
+            normalized = "home";
+          } else if (mode === "correlation") {
+            normalized = "correlation";
+          } else if (mode === "about") {
+            normalized = "about";
+          } else if (mode === "citation") {
+            normalized = "citation";
+          } else if (mode === "contact") {
+            normalized = "contact";
+          }
+
+          const showHome = normalized === "home";
+          const showExpression = normalized === "expression";
+          const showCorrelation = normalized === "correlation";
+          const showAbout = normalized === "about";
+          const showContactOnly = normalized === "contact";
+          const showContact = showAbout || showContactOnly;
+          const showCitation = normalized === "citation";
+
+          if (homeSection) {
+            homeSection.classList.toggle("hidden", !showHome);
+          }
+          if (expressionIntro) {
+            expressionIntro.classList.toggle("hidden", !showExpression);
+          }
+          if (expressionSection) {
+            expressionSection.classList.toggle("hidden", !showExpression);
+          }
+          if (correlationSection) {
+            correlationSection.classList.toggle("hidden", !showCorrelation);
+          }
+          if (aboutSection) {
+            aboutSection.classList.toggle("hidden", !showAbout);
+          }
+          if (contactSection) {
+            contactSection.classList.toggle("hidden", !showContact);
+          }
+          if (citationSection) {
+            citationSection.classList.toggle("hidden", !showCitation);
+          }
+        if (siteFooter) {
+            const shouldShowFooter = showExpression || showCorrelation;
+            siteFooter.classList.toggle("hidden", !shouldShowFooter);
+            if (shouldShowFooter) {
+              siteFooter.classList.add("has-background");
+            } else {
+              siteFooter.classList.remove("has-background");
+            }
+          }
+
+          if (!showExpression) {
+            clearExpressionPlots();
+          }
+          if (!showCorrelation) {
+            resetCorrelationOutput(true);
+          }
+
+          if (scrollIntoView) {
+            let target = null;
+            if (showExpression) {
+              target = expressionSection;
+            } else if (showCorrelation) {
+              target = correlationSection;
+            } else if (showHome) {
+              target = homeSection;
+            } else if (showAbout) {
+              target = aboutSection;
+            } else if (showContactOnly) {
+              target = contactSection;
+            } else if (showCitation) {
+              target = citationSection;
+            }
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }
+        }
+
+        viewToggleLinks.forEach(link => {
+          link.addEventListener("click", event => {
+            const targetView = event.currentTarget.dataset.viewTarget;
+            if (!targetView) {
+              return;
+            }
+            event.preventDefault();
+            setViewMode(targetView, { scrollIntoView: false });
+            if (typeof event.currentTarget.blur === "function") {
+              event.currentTarget.blur();
+            }
+            const dropdownParent = event.currentTarget.closest(".nav-item--has-dropdown");
+            if (dropdownParent) {
+              const toggleButton = dropdownParent.querySelector(".dropdown-toggle");
+              if (toggleButton && typeof toggleButton.blur === "function") {
+                toggleButton.blur();
+              }
+            }
+          });
+        });
+
+        setViewMode("home", { scrollIntoView: false });
+
         const categoryDetails = {
           molecular: [
             { value: "NFT", label: "NFT" },
@@ -353,43 +552,6 @@
             { value: "HGSC", label: "HGSC" }
           ]
         };
-
-        function updateViewMode() {
-          let activeMode = null;
-          viewRadios.forEach(radio => {
-            if (radio.checked) {
-              activeMode = radio.value;
-            }
-          });
-
-          if (activeMode === "expression") {
-            expressionSection.classList.remove("hidden");
-            correlationSection.classList.add("hidden");
-            resetCorrelationOutput(true);
-          } else if (activeMode === "correlation") {
-            correlationSection.classList.remove("hidden");
-            expressionSection.classList.add("hidden");
-          } else {
-            expressionSection.classList.add("hidden");
-            correlationSection.classList.add("hidden");
-            resetCorrelationOutput(true);
-          }
-
-          if (activeMode !== "expression") {
-            const plotImg = document.getElementById("plot");
-            const additionalImg = document.getElementById("additionalPlot");
-            const selectionImg = document.getElementById("selectionPlot");
-            if (plotImg) plotImg.innerHTML = "";
-            if (additionalImg) additionalImg.innerHTML = "";
-            if (selectionImg) selectionImg.innerHTML = "";
-          }
-        }
-
-        viewRadios.forEach(radio => {
-          radio.addEventListener("change", updateViewMode);
-        });
-
-        updateViewMode();
 
         function resetCategoryDetail() {
 
