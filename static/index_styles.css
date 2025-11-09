@@ -10,7 +10,13 @@ body {
 .site-hero {
     position: relative;
     padding: 5px 20px 0px;
-    background: linear-gradient(180deg, #fde4ec 0%, #f9c4e2 55%, #f4a3d4 100%);
+    background: linear-gradient(
+        180deg,
+        #fde4ec 0%,
+        #fde4ec 35%,
+        #f9c4e2 70%,
+        #f4a3d4 100%
+    );
 }
 
 .page-background {
@@ -371,7 +377,13 @@ body {
 .hero-bg {
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, #fde4ec 0%, #f9c4e2 55%, #f4a3d4 100%);
+    background: linear-gradient(
+        180deg,
+        #fde4ec 0%,
+        #fde4ec 35%,
+        #f9c4e2 70%,
+        #f4a3d4 100%
+    );
     pointer-events: none;
 }
 
@@ -381,9 +393,18 @@ body {
     flex-direction: column;
     padding: 0 20px 16px;
     box-sizing: border-box;
-    width: 100%;
     max-width: 1600px;
     margin: 0 auto;
+    width: 100%;
+}
+
+.page-background {
+    background: #fffefc;
+    width: 100%;
+}
+
+body {
+    background: #fffefc;
 }
 
 button,
