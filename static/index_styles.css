@@ -520,7 +520,6 @@ label {
 #plot,
 #additionalPlot,
 #selectionPlot,
-#correlationPlot,
 #correlationResult {
     max-width: 640px;
     width: 100%;
@@ -531,6 +530,13 @@ label {
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
     margin-top: 14px;
     display: none;
+}
+
+#plot.has-content,
+#additionalPlot.has-content,
+#selectionPlot.has-content,
+#correlationResult.has-content {
+    display: block;
 }
 
 #plot img,

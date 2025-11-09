@@ -164,7 +164,6 @@
                 </div>
             </details>
         </div>
-        <p>Please enter a category and two genes to view their correlation:</p>
         <form id="correlationForm" onsubmit="generateCorrelation(); return false;">
             <div class="form-field">
                 <label for="corCategory">Select Category:</label>
@@ -406,19 +405,28 @@
           }
           if (correlationResult) {
             correlationResult.classList.add("hidden");
+            correlationResult.classList.remove("has-content");
           }
           if (clearError && correlationError) {
             correlationError.textContent = "";
           }
         }
 
+        function setPlotContainerContent(element, html) {
+          if (!element) return;
+          if (html) {
+            element.innerHTML = html;
+            element.classList.add("has-content");
+          } else {
+            element.innerHTML = "";
+            element.classList.remove("has-content");
+          }
+        }
+
         function clearExpressionPlots() {
-          const plotImg = document.getElementById("plot");
-          const additionalImg = document.getElementById("additionalPlot");
-          const selectionImg = document.getElementById("selectionPlot");
-          if (plotImg) plotImg.innerHTML = "";
-          if (additionalImg) additionalImg.innerHTML = "";
-          if (selectionImg) selectionImg.innerHTML = "";
+          setPlotContainerContent(document.getElementById("plot"), "");
+          setPlotContainerContent(document.getElementById("additionalPlot"), "");
+          setPlotContainerContent(document.getElementById("selectionPlot"), "");
         }
 
         function setViewMode(mode, { scrollIntoView = true } = {}) {
@@ -827,6 +835,7 @@
               }
               correlationStatsDiv.innerHTML = fragments.join("");
               correlationResult.classList.remove("hidden");
+              correlationResult.classList.add("has-content");
               correlationError.textContent = "";
             })
             .catch(err => {
@@ -834,6 +843,9 @@
                 err && err.message
                   ? err.message
                   : "Unable to generate correlation.";
+              if (correlationResult) {
+                correlationResult.classList.remove("has-content");
+              }
             })
             .finally(() => {
               if (generateCorrelationButton) {
@@ -870,19 +882,22 @@
             return res.json();
           })
           .then(data => {
-            // Always show first plot (Diagnosis)
-            document.getElementById("plot").innerHTML =
-              `<img src="${data.plot_url1}" alt="Boxplot of Pathologic Diagnosis">`;
+            const plotDiv = document.getElementById("plot");
+            setPlotContainerContent(
+              plotDiv,
+              `<img src="${data.plot_url1}" alt="Boxplot of Pathologic Diagnosis">`
+            );
 
-            // Now handle the second plot (Molecular subtype)
             const secondDiv = document.getElementById("additionalPlot");
-            const thirdDiv  = document.getElementById("selectionPlot");
-            secondDiv.innerHTML = "";
-            thirdDiv.innerHTML  = "";
+            const thirdDiv = document.getElementById("selectionPlot");
+            setPlotContainerContent(secondDiv, "");
+            setPlotContainerContent(thirdDiv, "");
 
             if (typeof data.plot_url2 === "string" && data.plot_url2.startsWith("data:image")) {
-              secondDiv.innerHTML =
-                `<img src="${data.plot_url2}" alt="Boxplot of Molecular Subtype">`;
+              setPlotContainerContent(
+                secondDiv,
+                `<img src="${data.plot_url2}" alt="Boxplot of Molecular Subtype">`
+              );
             }
 
             if (
@@ -890,16 +905,19 @@
               data.plot_url3.startsWith("data:image")
             ) {
               const label = selCat ? selCat : "Selected category";
-              thirdDiv.innerHTML =
-                `<img src="${data.plot_url3}" alt="Boxplot of ${label}">`;
+              setPlotContainerContent(
+                thirdDiv,
+                `<img src="${data.plot_url3}" alt="Boxplot of ${label}">`
+              );
             }
 
             // Clear any error
             document.getElementById("error").innerText = "";
           })
           .catch(err => {
-            document.getElementById("plot").innerHTML          = "";
-            document.getElementById("additionalPlot").innerHTML = "";
+            setPlotContainerContent(document.getElementById("plot"), "");
+            setPlotContainerContent(document.getElementById("additionalPlot"), "");
+            setPlotContainerContent(document.getElementById("selectionPlot"), "");
             document.getElementById("error").innerText         = err.message;
           })
           .finally(() => {
