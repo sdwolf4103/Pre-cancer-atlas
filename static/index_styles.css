@@ -5,6 +5,8 @@
 :root {
     --p-size-desktop: 1.125rem; /* 18px */
     --p-size-mobile: 1.25rem;   /* 20px */
+    --h2-min: calc(var(--p-size-desktop) + 0.125rem);
+    --h2-max: 1.6rem;
 }
 
 html {
@@ -14,7 +16,8 @@ html {
 
 body {
     font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 1rem;
+    font-size: var(--p-size-desktop);
+    line-height: 1.65;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -24,8 +27,8 @@ body {
 
 /* Desktop body copy = 18px, Mobile = 20px */
 p {
-    font-size: var(--p-size-desktop);
-    line-height: 1.65;
+    font-size: inherit;
+    line-height: inherit;
     margin: 0 0 8px 0;
 }
 
@@ -39,7 +42,10 @@ p:last-child {
 }
 
 @media (max-width: 768px) {
-    p {
+    :root {
+        --h2-min: calc(var(--p-size-mobile) + 0.125rem);
+    }
+    body {
         font-size: var(--p-size-mobile);
     }
 }
@@ -51,6 +57,24 @@ label {
 
 @media (max-width: 768px) {
     label {
+        font-size: var(--p-size-mobile);
+    }
+}
+
+/* Readable control sizing */
+input[type="text"],
+select,
+button {
+    font-size: var(--p-size-desktop);
+    line-height: 1.35;
+    min-height: auto;
+    padding: 0.45em 0.75em;
+}
+
+@media (max-width: 768px) {
+    input[type="text"],
+    select,
+    button {
         font-size: var(--p-size-mobile);
     }
 }
@@ -123,7 +147,8 @@ label {
 
 .nav-list > li { position: relative; }
 
-.nav-link {
+.nav-link,
+.dropdown-toggle {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -136,7 +161,8 @@ label {
     background: transparent;
     color: #1d3557;
     font: inherit;
-    font-size: 1.2rem;
+    font-size: var(--p-size-desktop);
+    line-height: 1.2;
     font-weight: 600;
     text-decoration: none;
     cursor: pointer;
@@ -164,7 +190,6 @@ label {
 .dropdown-toggle {
     border-radius: 10px 10px 0 0;
     margin-top: 0;
-    font-size: 1.2rem;
     padding: 0.55em 1.1em 0.65em;
 }
 
@@ -210,12 +235,107 @@ label {
     border-radius: 8px;
     border-bottom: none;
     justify-content: flex-start;
+    font-size: var(--p-size-desktop);
+    line-height: 1.2;
 }
 
 .nav-dropdown .nav-link:hover,
 .nav-dropdown .nav-link:focus-visible {
     background: rgba(29, 53, 87, 0.08);
     color: #0c1f38;
+}
+
+@media (max-width: 768px) {
+    .nav-link,
+    .dropdown-toggle {
+        font-size: var(--p-size-mobile);
+    }
+}
+
+/* --- Mobile nav: 2-per-row + overlay dropdown --- */
+@media (max-width: 600px) {
+    .nav-list {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px 10px;
+        padding: 6px 0;
+    }
+    .nav-list > li {
+        flex: 1 1 calc(50% - 10px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .nav-link {
+        width: 100%;
+        text-align: center;
+        padding: 0.4em 0.75em;
+        font-size: 1rem;
+        line-height: 1.2;
+        border-radius: 8px;
+        white-space: nowrap;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .primary-nav,
+    .site-hero {
+        overflow: visible;
+    }
+
+    .nav-item--has-dropdown {
+        position: static;
+    }
+
+    .nav-item--has-dropdown .nav-dropdown {
+        display: none;
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: calc(100% + 6px);
+        min-width: 0;
+        margin: 0;
+        padding: 8px 0;
+        background: #ffffff;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 12px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+        z-index: 200;
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+    }
+
+    .nav-item--has-dropdown.is-open .nav-dropdown {
+        display: block;
+    }
+
+    .nav-dropdown .nav-link {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 10px 14px;
+        margin: 0;
+        border-radius: 8px;
+        border-bottom: 0;
+    }
+
+    .nav-item--has-dropdown::after {
+        display: none;
+    }
+
+    .nav-link,
+    .nav-dropdown .nav-link {
+        min-height: auto;
+        line-height: 1.2;
+    }
+
+    .nav-dropdown .nav-link {
+        font-size: var(--p-size-mobile);
+    }
+
+    .nav-link:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(29, 53, 87, 0.25) inset;
+    }
 }
 
 /* Optional hero gradient overlay container */
@@ -262,12 +382,12 @@ h1 { margin: 0; }
 
 .page-subtitle {
     margin: 0;
-    font-size: clamp(0.85rem, 1.6vw, 1rem);
+    font-size: clamp(1rem, 1.8vw, 1.1rem);
     font-weight: 500;
     font-style: italic;
     color: #4a2a39;
     letter-spacing: 0.02em;
-    line-height: 1.2;
+    line-height: 1.35;
 }
 
 /* =========================
@@ -310,8 +430,14 @@ h1 { margin: 0; }
 
 .home-figure figcaption {
     margin-top: 8px;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     color: #5b4e59;
+}
+
+@media (max-width: 768px) {
+    .home-figure figcaption {
+        font-size: 1rem;
+    }
 }
 
 /* =========================
@@ -332,7 +458,8 @@ h1 { margin: 0; }
 .about-section h2,
 .citation-section h2 {
     margin: 0 0 8px 0;
-    font-size: clamp(1.2rem, 2.8vw, 1.6rem);
+    font-size: clamp(var(--h2-min), 2.8vw, var(--h2-max));
+    line-height: 1.25;
     color: #2f1a2c;
 }
 
@@ -446,8 +573,55 @@ form {
 
 .gene-input-line input[type="text"] { width: 100%; }
 
+/* Gene autocomplete dropdown */
+.gene-suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #cfd2da;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.15);
+    padding: 4px 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 30;
+}
+
+.gene-suggestions.hidden {
+    display: none;
+}
+
+.gene-suggestion {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.gene-suggestion + .gene-suggestion {
+    border-top: 1px solid #edf0f5;
+}
+
+.gene-suggestion:hover,
+.gene-suggestion:focus {
+    background: rgba(29, 53, 87, 0.08);
+    outline: none;
+}
+
+.gene-suggestion.empty {
+    cursor: default;
+    color: #6b7280;
+    font-style: italic;
+}
+
 input[type="text"] {
-    padding: 0.4em 0.75em;
+    padding: 0.45em 0.75em;
     border-radius: 4px;
     border: 1px solid #ccc;
 }
@@ -461,6 +635,8 @@ input[type="text"] {
     max-width: 160px;
     margin-right: 8px;
     height: 36px;
+    font-size: inherit;
+    line-height: 1.35;
 }
 
 .multi-select summary {
@@ -481,6 +657,8 @@ input[type="text"] {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: inherit;
+    line-height: 1.35;
 }
 
 .multi-select summary::-webkit-details-marker { display: none; }
@@ -491,7 +669,7 @@ input[type="text"] {
     right: 10px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 0.875rem;
+    font-size: 0.9em;
     color: #555;
 }
 
@@ -519,6 +697,8 @@ input[type="text"] {
     overflow-y: auto;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
     z-index: 50;
+    font-size: inherit;
+    line-height: 1.35;
 }
 
 .multi-option {
@@ -526,6 +706,8 @@ input[type="text"] {
     align-items: center;
     gap: 6px;
     font-weight: normal;
+    font-size: inherit;
+    line-height: 1.35;
 }
 
 .multi-option input[type="checkbox"] {
@@ -536,8 +718,7 @@ input[type="text"] {
 
 /* Buttons */
 button[type="submit"] {
-    padding: 0 1em;
-    height: 2.6em;
+    padding: 0.5em 1em;
     border: none;
     background-color: #868f9b;
     color: #fff;
@@ -655,4 +836,164 @@ a { text-decoration: none; color: #007bff; margin-right: 10px; }
 ========================= */
 @media (max-width: 768px) {
     .home-section { padding: 24px 0 16px; }
+}
+
+
+/* ============================================
+   MOBILE HEADER + NAV FIXES
+   ============================================ */
+html, body {
+    overflow-x: hidden; /* Prevent sideways scrolling */
+}
+
+@media (max-width: 600px) {
+
+  /* HEADER */
+  .hero-heading {
+    justify-content: flex-start;
+    gap: 12px;
+  }
+
+  .site-logo {
+    display: none !important;
+  }
+
+  .page-title {
+    font-size: clamp(1.875rem, 6vw, 1.95rem);
+    line-height: 1.15;
+  }
+
+  .page-subtitle {
+    font-size: clamp(1rem, 3.5vw, 1.1rem);
+    line-height: 1.3;
+    max-width: 92%;
+  }
+
+  .site-hero {
+    padding: 5px 16px 0;
+  }
+
+  .primary-nav {
+    padding-top: 2px; /* compact */
+  }
+
+  /* NAV: two items per row, centered */
+  .nav-list {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 10px;
+    padding: 6px 0;
+  }
+
+  .nav-list > li {
+    flex: 1 1 calc(50% - 10px); /* Row1: Home | Gene Explore; Row2: How to Cite | About Us */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .nav-link {
+    width: 100%;
+    text-align: center;
+    padding: 0.4em 0.75em;
+    font-size: var(--p-size-mobile);
+    line-height: 1.2;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+
+  /* DROPDOWN: do not reserve space when closed */
+  .nav-item--has-dropdown::after { display: none; }
+
+  .nav-dropdown {
+    display: none;
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    top: calc(100% + 6px);
+    min-width: 0;
+    padding: 8px 0;
+    margin: 0;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+    z-index: 200;
+  }
+
+  .nav-item--has-dropdown.is-open .nav-dropdown {
+    display: block;
+  }
+
+  .nav-dropdown .nav-link {
+    width: 100%;
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border-bottom: 0;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+  }
+
+  /* FORMS: larger touch-friendly text */
+  input,
+  select,
+  button,
+  label {
+    font-size: var(--p-size-mobile) !important;
+  }
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .form-field label {
+    white-space: normal;
+    margin-bottom: 0;
+  }
+
+  .form-field select,
+  .category-display {
+    width: 100% !important;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .detail-field {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .detail-field .detail-label {
+    font-weight: 600;
+    font-size: var(--p-size-mobile);
+    align-self: flex-start;
+  }
+
+  #categoryDetailDropdown {
+    width: 100%;
+  }
+
+  #categoryDetailDropdown summary {
+    justify-content: flex-start;
+    text-align: left;
+    padding-left: 0.75em;
+    padding-right: 0.75em;
+  }
+
+  #categoryDetailWrapper {
+    align-items: flex-start !important;
+    width: 100%;
+  }
+
+  #categoryDetailWrapper .multi-select {
+    width: 100%;
+  }
 }

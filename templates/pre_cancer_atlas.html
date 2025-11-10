@@ -4,6 +4,7 @@
     <title>Ovarian Pre-cancer Atlas</title>
     <meta name="title" content="Ovarian Pre-Cancer Atlas – Spatial Transcriptomic Explorer">
     <meta name="description" content="Interactive platform for exploring ovarian precursor lesions and integrated spatial transcriptomic data.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="keywords" content="ovarian cancer, STIC, STIL, fallopian tube, spatial transcriptomics, GeoMx, precursor lesions, HGSC, high-grade serous carcinoma, gene expression, molecular subtypes">
     <meta name="robots" content="index, follow">
     <meta name="author" content="Shih Lab, Johns Hopkins University">
@@ -927,6 +928,51 @@
             }
           });
         }
+
+        // Mobile dropdown toggle for Gene Explore
+        (function () {
+          const dropdownParents = Array.from(
+            document.querySelectorAll(".nav-item--has-dropdown")
+          );
+          if (!dropdownParents.length) {
+            return;
+          }
+
+          dropdownParents.forEach(parent => {
+            const trigger =
+              parent.querySelector(".dropdown-toggle") ||
+              parent.querySelector(".nav-link");
+            if (!trigger) {
+              return;
+            }
+            trigger.addEventListener("click", event => {
+              event.preventDefault();
+              const isOpen = parent.classList.contains("is-open");
+              dropdownParents.forEach(item => item.classList.remove("is-open"));
+              if (!isOpen) {
+                parent.classList.add("is-open");
+              }
+            });
+
+            parent.querySelectorAll(".nav-dropdown .nav-link").forEach(link => {
+              link.addEventListener("click", () => {
+                dropdownParents.forEach(item => item.classList.remove("is-open"));
+              });
+            });
+          });
+
+          document.addEventListener("click", event => {
+            if (!event.target.closest(".nav-item--has-dropdown")) {
+              dropdownParents.forEach(item => item.classList.remove("is-open"));
+            }
+          });
+
+          document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+              dropdownParents.forEach(item => item.classList.remove("is-open"));
+            }
+          });
+        })();
       </script>
 </body>
 </html>
