@@ -445,6 +445,7 @@ h1 { margin: 0; }
 ========================= */
 .expression-intro,
 .correlation-intro,
+.heatmap-intro,
 .contact-section,
 .about-section,
 .citation-section {
@@ -454,6 +455,7 @@ h1 { margin: 0; }
 
 .expression-intro h2,
 .correlation-intro h2,
+.heatmap-intro h2,
 .contact-section h2,
 .about-section h2,
 .citation-section h2 {
@@ -465,6 +467,7 @@ h1 { margin: 0; }
 
 .expression-intro p,
 .correlation-intro p,
+.heatmap-intro p,
 .contact-section p,
 .citation-section p {
     line-height: 1.6;
@@ -544,6 +547,19 @@ form {
 
 .form-field label { white-space: nowrap; font-weight: bold; }
 #categoryDetailWrapper { align-items: center; }
+.detail-field {
+    align-items: center;
+}
+
+.detail-field #categoryDetailDropdown {
+    align-self: center;
+}
+
+.detail-field .detail-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.4em;
+}
 
 .form-field select,
 .form-field input[type="text"] {
@@ -626,15 +642,36 @@ input[type="text"] {
     border: 1px solid #ccc;
 }
 
+textarea {
+    padding: 0.45em 0.75em;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-family: inherit;
+    font-size: var(--p-size-desktop);
+    line-height: 1.4;
+    width: 100%;
+    max-width: 480px;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+.heatmap-placeholder {
+    margin-top: 16px;
+    padding: 18px;
+    border: 1px dashed rgba(29, 53, 87, 0.3);
+    border-radius: 12px;
+    background: #f8fbff;
+    color: #1d3557;
+}
 /* multi-select */
 .multi-select {
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    align-items: stretch;
     min-width: 120px;
     width: 160px;
     max-width: 160px;
     margin-right: 8px;
-    height: 36px;
     font-size: inherit;
     line-height: 1.35;
 }
@@ -645,7 +682,7 @@ input[type="text"] {
     border: 1px solid #ccc;
     border-radius: 4px;
     padding: 0.4em 0.75em;
-    height: 2.4em;
+    min-height: 2.4em;
     box-sizing: border-box;
     user-select: none;
     background: #fff;
@@ -975,10 +1012,12 @@ html, body {
     font-weight: 600;
     font-size: var(--p-size-mobile);
     align-self: flex-start;
+    min-height: auto;
   }
 
   #categoryDetailDropdown {
     width: 100%;
+    align-self: stretch;
   }
 
   #categoryDetailDropdown summary {
@@ -986,6 +1025,7 @@ html, body {
     text-align: left;
     padding-left: 0.75em;
     padding-right: 0.75em;
+    width: 100%;
   }
 
   #categoryDetailWrapper {
@@ -995,5 +1035,7 @@ html, body {
 
   #categoryDetailWrapper .multi-select {
     width: 100%;
+    max-width: 100%;
+    margin-right: 0;
   }
 }

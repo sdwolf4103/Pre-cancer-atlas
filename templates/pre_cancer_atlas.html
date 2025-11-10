@@ -47,6 +47,7 @@
                             <ul class="nav-dropdown">
                                 <li><a class="nav-link" href="#expressionSection" data-view-target="expression">Gene Expression</a></li>
                                 <li><a class="nav-link" href="#correlationSection" data-view-target="correlation">Gene Correlation</a></li>
+                                <li><a class="nav-link" href="#heatmapSection" data-view-target="heatmap">Heatmap</a></li>
                             </ul>
                         </li>
                         <li><a class="nav-link" href="#citation" data-view-target="citation">How to Cite</a></li>
@@ -87,7 +88,7 @@
     <section class="expression-intro" data-view-section="expression">
         <h2>Gene Expression across Ovarian Precancerous Lesions</h2>
         <p>
-            Explore mRNA expression measured by NanoString GeoMx DSP across normal fallopian tube epithelium and precursor lesions, and high-grade serous carcinoma.
+            Explore modeled RNA expression across normal fallopian tube epithelium, precursor lesions, and high-grade serous carcinoma using NanoString GeoMx DSP data.
         </p>
         <details class="how-to-details">
             <summary>💡 How to Use</summary>
@@ -224,6 +225,47 @@
         <div id="correlationError" style="color: red;"></div>
     </section>
 
+    <section class="heatmap-intro hidden" data-view-section="heatmap">
+        <h2>RNA Expression Heatmap across Ovarian Precancerous Lesions</h2>
+        <p>
+            Build quick gene panels and preview how RNA expression patterns compare across precancer lesion groups.
+        </p>
+        <details class="how-to-details">
+            <summary>💡 How to Use</summary>
+            <div class="how-to-panel">
+                <ol>
+                    <li><strong>Select Type:</strong> Choose Epithelium, Stroma, or Both to define the tissue compartment.</li>
+                    <li><strong>Enter Gene List:</strong> Provide official gene symbols separated by commas (e.g., IGFBP2, KIFC1, MMP7, CD74).</li>
+                    <li><strong>Generate Plot:</strong> A heatmap preview will appear here in a future update.</li>
+                </ol>
+                <p class="how-to-note">
+                    This prototype focuses on layout and interaction. Plot generation will be wired up in the next iteration.
+                </p>
+            </div>
+        </details>
+    </section>
+
+    <section id="heatmapSection" class="hidden">
+        <form id="heatmapForm" onsubmit="return false;">
+            <div class="form-field">
+                <label for="heatmapType">Select Type:</label>
+                <select name="heatmapType" id="heatmapType">
+                    <option value="epithelium">Epithelium</option>
+                    <option value="stroma">Stroma</option>
+                    <option value="both">Both Epithelium and Stroma</option>
+                </select>
+            </div>
+            <div class="form-field gene-field">
+                <label for="heatmapGenes">Enter Gene List:</label>
+                <textarea id="heatmapGenes" name="heatmapGenes" rows="3" placeholder="SOX4, MMP7, CD74" style="min-width:240px; max-width:100%;"></textarea>
+            </div>
+            <button type="button" class="form-submit" disabled title="Heatmap coming soon">Generate Heatmap</button>
+        </form>
+        <div class="heatmap-placeholder hidden" id="heatmapPlaceholder">
+            Heatmap preview coming soon. You’ll be able to compare expression patterns across lesion groups here.
+        </div>
+    </section>
+
     <div id="plot"></div>
     <div id="additionalPlot"></div>
     <div id="selectionPlot"></div>
@@ -274,10 +316,12 @@
         const homeSection = document.getElementById("home");
         const expressionSection = document.getElementById("expressionSection");
         const correlationSection = document.getElementById("correlationSection");
+        const heatmapSection = document.getElementById("heatmapSection");
         const aboutSection = document.getElementById("about");
         const contactSection = document.getElementById("contact");
         const citationSection = document.getElementById("citation");
         const expressionIntro = document.querySelector('[data-view-section="expression"]');
+        const heatmapIntro = document.querySelector('[data-view-section="heatmap"]');
         const viewToggleLinks = document.querySelectorAll("[data-view-target]");
         const geneInput = document.getElementById("gene");
         const geneSuggestions = document.getElementById("gene-suggestions");
@@ -301,6 +345,7 @@
         const generateCorrelationButton = document.getElementById(
           "generateCorrelationButton"
         );
+        const heatmapPlaceholder = document.getElementById("heatmapPlaceholder");
 
         function setupGeneAutocomplete(inputElement, suggestionElement) {
           if (!inputElement || !suggestionElement) {
@@ -436,6 +481,8 @@
             normalized = "home";
           } else if (mode === "correlation") {
             normalized = "correlation";
+          } else if (mode === "heatmap") {
+            normalized = "heatmap";
           } else if (mode === "about") {
             normalized = "about";
           } else if (mode === "citation") {
@@ -447,6 +494,7 @@
           const showHome = normalized === "home";
           const showExpression = normalized === "expression";
           const showCorrelation = normalized === "correlation";
+          const showHeatmap = normalized === "heatmap";
           const showAbout = normalized === "about";
           const showContactOnly = normalized === "contact";
           const showContact = showAbout || showContactOnly;
@@ -464,6 +512,12 @@
           if (correlationSection) {
             correlationSection.classList.toggle("hidden", !showCorrelation);
           }
+          if (heatmapIntro) {
+            heatmapIntro.classList.toggle("hidden", !showHeatmap);
+          }
+          if (heatmapSection) {
+            heatmapSection.classList.toggle("hidden", !showHeatmap);
+          }
           if (aboutSection) {
             aboutSection.classList.toggle("hidden", !showAbout);
           }
@@ -474,7 +528,7 @@
             citationSection.classList.toggle("hidden", !showCitation);
           }
         if (siteFooter) {
-            const shouldShowFooter = showExpression || showCorrelation;
+            const shouldShowFooter = showExpression || showCorrelation || showHeatmap;
             siteFooter.classList.toggle("hidden", !shouldShowFooter);
             if (shouldShowFooter) {
               siteFooter.classList.add("has-background");
@@ -489,6 +543,11 @@
           if (!showCorrelation) {
             resetCorrelationOutput(true);
           }
+          if (heatmapPlaceholder && !showHeatmap) {
+            heatmapPlaceholder.classList.add("hidden");
+          } else if (heatmapPlaceholder && showHeatmap) {
+            heatmapPlaceholder.classList.remove("hidden");
+          }
 
           if (scrollIntoView) {
             let target = null;
@@ -496,6 +555,8 @@
               target = expressionSection;
             } else if (showCorrelation) {
               target = correlationSection;
+            } else if (showHeatmap) {
+              target = heatmapSection;
             } else if (showHome) {
               target = homeSection;
             } else if (showAbout) {
