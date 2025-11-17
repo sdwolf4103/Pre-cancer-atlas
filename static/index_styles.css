@@ -662,6 +662,26 @@ textarea {
     border-radius: 12px;
     background: #f8fbff;
     color: #1d3557;
+    overflow-y: auto;
+    max-height: 520px;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.heatmap-image {
+    width: 100%;
+    max-width: 640px;
+    height: auto;
+    display: block;
+}
+
+.heatmap-note {
+    margin-top: 10px;
+    font-style: italic;
+    color: #5b1a31;
 }
 /* multi-select */
 .multi-select {
@@ -766,21 +786,30 @@ button[type="submit"] {
 button[type="submit"]:hover { background-color: #50565c; }
 .form-submit { align-self: center; }
 
+.form-error {
+    color: #b00020;
+    margin-top: 8px;
+    font-size: 0.95rem;
+}
+
 #generatePlotButton,
-#generateCorrelationButton {
+#generateCorrelationButton,
+#generateHeatmapButton {
     position: relative;
     display: inline-grid;
     place-items: center;
 }
 
 #generatePlotButton .label,
-#generateCorrelationButton .label {
+#generateCorrelationButton .label,
+#generateHeatmapButton .label {
     grid-area: 1 / 1 / 2 / 2;
     transition: opacity 0.15s ease;
 }
 
 #generatePlotButton .loading-spinner,
-#generateCorrelationButton .loading-spinner {
+#generateCorrelationButton .loading-spinner,
+#generateHeatmapButton .loading-spinner {
     grid-area: 1 / 1 / 2 / 2;
     width: 1.2em;
     height: 1.2em;
@@ -792,11 +821,14 @@ button[type="submit"]:hover { background-color: #50565c; }
 }
 
 #generatePlotButton.is-loading .label,
-#generateCorrelationButton.is-loading .label { opacity: 0; }
+#generateCorrelationButton.is-loading .label,
+#generateHeatmapButton.is-loading .label { opacity: 0; }
 #generatePlotButton.is-loading .loading-spinner,
-#generateCorrelationButton.is-loading .loading-spinner { display: block; }
+#generateCorrelationButton.is-loading .loading-spinner,
+#generateHeatmapButton.is-loading .loading-spinner { display: block; }
 #generatePlotButton.is-loading,
-#generateCorrelationButton.is-loading { pointer-events: none; }
+#generateCorrelationButton.is-loading,
+#generateHeatmapButton.is-loading { pointer-events: none; }
 
 @keyframes button-spin {
     from { transform: rotate(0deg); }
