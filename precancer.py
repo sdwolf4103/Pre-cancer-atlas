@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+import re
 import threading
 from functools import lru_cache
 from pathlib import Path
@@ -16,6 +17,11 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+
+try:
+    import seaborn as sns
+except ImportError:  # seaborn optional
+    sns = None
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -73,6 +79,15 @@ CATEGORY_LABEL_MAP = {
 }
 
 DEFAULT_CORRELATION_TYPE = "epithelium"
+MOLECULAR_SUBTYPE_ORDER = [
+    "Stroma",
+    "NFT",
+    "Dormant",
+    "Mixed",
+    "Immunoreactive",
+    "Proliferative",
+    "HGSC",
+]
 
 _COUNT_PARQUET: Optional[pq.ParquetFile] = None
 _COUNT_PARQUET_LOCK = threading.Lock()
@@ -430,15 +445,7 @@ def plot():
             500,
         )
 
-    categories_order = [
-        "Stroma",
-        "NFT",
-        "Dormant",
-        "Mixed",
-        "Immunoreactive",
-        "Proliferative",
-        "HGSC",
-    ]
+    categories_order = MOLECULAR_SUBTYPE_ORDER
 
     def _merge_with_annotations(
         annotations: pd.DataFrame, force_label: str | None = None
@@ -675,9 +682,7 @@ def plot():
                 y = selection_data.loc[mask, "Count"]
                 ax3.scatter(x, y, color="black", alpha=0.6, s=point_size)
 
-            ax3.set_title(
-                f"{gene} Expression by {selection.title()}", fontsize=14
-            )
+            ax3.set_title(f"{gene} Expression by {selection.title()}", fontsize=14)
             fig3.suptitle("")
             ax3.set_xlabel(selection, fontsize=12)
             ax3.set_ylabel("Normalized Gene Count", fontsize=12)
@@ -786,7 +791,10 @@ def correlation():
                         elif selected == "Other":
                             for text, original in normalized_unique:
                                 lower = text.lower()
-                                if text not in {"BRCA1", "BRCA2"} and lower != "negative":
+                                if (
+                                    text not in {"BRCA1", "BRCA2"}
+                                    and lower != "negative"
+                                ):
                                     filter_values.add(original)
                         else:
                             filter_values.add(selected)
@@ -892,6 +900,260 @@ def correlation():
         "stats_text": stats_text,
         "sample_count": sample_count,
         "summary": filter_summary,
+    }
+    return jsonify(response)
+
+
+@app.route("/pre_cancer_heatmap", methods=["POST"])
+def heatmap():
+    heatmap_type = (request.form.get("heatmapType") or "stroma").strip().lower()
+    if heatmap_type not in {"epithelium", "stroma", "both"}:
+        heatmap_type = "stroma"
+
+    gene_input = request.form.get("heatmapGenes") or ""
+    tokens = [
+        token.strip().upper()
+        for token in re.split(r"[,;\s]+", gene_input)
+        if token.strip()
+    ]
+    # Preserve order while removing duplicates
+    seen: Dict[str, None] = {}
+    genes: List[str] = []
+    for token in tokens:
+        if token not in seen:
+            seen[token] = None
+            genes.append(token)
+
+    if not genes:
+        return jsonify(error="Please enter at least one gene symbol."), 400
+
+    max_genes = 25
+    if len(genes) > max_genes:
+        genes = genes[:max_genes]
+
+    group_mode = (request.form.get("heatmapCategory") or "diagnosis").strip().lower()
+    if group_mode not in {"molecular", "diagnosis"}:
+        group_mode = "diagnosis"
+
+    scale_mode = (request.form.get("heatmapScale") or "raw").strip().lower()
+    if scale_mode not in {"raw", "zscore"}:
+        scale_mode = "raw"
+    scale_label = "Mean normalized count" if scale_mode == "raw" else "Per-gene z-score"
+
+    try:
+        annotation_sets: List[tuple[pd.DataFrame, Optional[str], bool]] = []
+        if heatmap_type in {"epithelium", "both"}:
+            annotation_sets.append((_prepare_annotation("epithelium"), None, False))
+        if heatmap_type in {"stroma", "both"}:
+            collapse_stroma = heatmap_type == "both"
+            forced_label = "Stroma" if collapse_stroma else None
+            annotation_sets.append(
+                (_prepare_annotation("stroma"), forced_label, collapse_stroma)
+            )
+        if not annotation_sets:
+            return jsonify(error="Unable to load annotation data."), 500
+    except FileNotFoundError:
+        return (
+            jsonify(
+                error=(
+                    "Annotation data file not found. "
+                    "Set DATA_DIR to the directory containing anno_data.parquet."
+                )
+            ),
+            500,
+        )
+    except Exception as exc:
+        return jsonify(error=f"Unable to load annotation data: {exc}"), 500
+
+    if group_mode == "diagnosis":
+        category_order = ["Stroma", "NFT", "p53 sig", "STIL", "STIC", "HGSC"]
+    else:
+        category_order = MOLECULAR_SUBTYPE_ORDER
+
+    expression_matrix = pd.DataFrame(index=category_order, dtype=float)
+    missing_genes: List[str] = []
+
+    def _prepare_group_frame(
+        frame: pd.DataFrame, forced_label: Optional[str], collapse_to_stroma: bool
+    ) -> pd.DataFrame:
+        df = frame.copy()
+        if forced_label:
+            df["Molecular_Subtype"] = forced_label
+        df["Molecular_Subtype"] = pd.Categorical(
+            df["Molecular_Subtype"], categories=MOLECULAR_SUBTYPE_ORDER, ordered=True
+        )
+        df = df.dropna(subset=["Molecular_Subtype"])
+        if df.empty:
+            return df
+        if collapse_to_stroma:
+            df["Heatmap_Group"] = "Stroma"
+        elif group_mode == "diagnosis":
+            df["Heatmap_Group"] = df["Diagnosis"].astype("object")
+            if forced_label is None:
+                df.loc[df["Molecular_Subtype"] == "Stroma", "Heatmap_Group"] = "Stroma"
+            df["Heatmap_Group"] = df["Heatmap_Group"].replace({"STICL": "STIC"})
+        else:
+            df["Heatmap_Group"] = df["Molecular_Subtype"]
+        df["Heatmap_Group"] = pd.Categorical(
+            df["Heatmap_Group"], categories=category_order, ordered=True
+        )
+        df = df.dropna(subset=["Heatmap_Group"])
+        return df
+
+    group_sample_sets: Dict[str, set[str]] = {cat: set() for cat in category_order}
+    for annotations, forced_label, collapse_to_stroma in annotation_sets:
+        grouped = _prepare_group_frame(annotations, forced_label, collapse_to_stroma)
+        if grouped.empty:
+            continue
+        for group_value, sample_id in grouped[
+            ["Heatmap_Group", "SegmentDisplayName"]
+        ].itertuples(index=False):
+            if pd.isna(group_value):
+                continue
+            group_sample_sets.setdefault(group_value, set()).add(str(sample_id))
+
+    group_stats: Dict[str, int] = {
+        cat: len(samples) for cat, samples in group_sample_sets.items()
+    }
+
+    for gene in genes:
+        try:
+            counts = _extract_gene_counts(gene)
+        except Exception as exc:
+            logger.warning("Unable to extract counts for %s: %s", gene, exc)
+            missing_genes.append(gene)
+            continue
+
+        if counts.empty:
+            missing_genes.append(gene)
+            continue
+
+        merged_frames: List[pd.DataFrame] = []
+        for annotations, forced_label, collapse_to_stroma in annotation_sets:
+            subset = counts.merge(
+                annotations, left_on="Sample", right_on="SegmentDisplayName"
+            )
+            if subset.empty:
+                continue
+            grouped = _prepare_group_frame(
+                subset, forced_label, collapse_to_stroma
+            )
+            if grouped.empty:
+                continue
+            merged_frames.append(grouped[["Heatmap_Group", "Count"]])
+
+        if not merged_frames:
+            missing_genes.append(gene)
+            continue
+
+        combined = pd.concat(merged_frames, ignore_index=True)
+        if scale_mode == "zscore":
+            values = combined["Count"].astype(float)
+            if not values.empty:
+                mean_val = values.mean()
+                std_val = values.std(ddof=0)
+                if std_val > 0 and not np.isclose(std_val, 0):
+                    combined["Count"] = (values - mean_val) / std_val
+                else:
+                    combined["Count"] = values - mean_val
+        combined["Heatmap_Group"] = pd.Categorical(
+            combined["Heatmap_Group"], categories=category_order, ordered=True
+        )
+        group_means = combined.groupby("Heatmap_Group", observed=True)["Count"]
+        averages = group_means.mean()
+        expression_matrix[gene] = averages
+
+    expression_matrix = expression_matrix.dropna(how="all")
+    if expression_matrix.empty:
+        message = "No expression data found for the selected genes."
+        if missing_genes:
+            message += f" Missing genes: {', '.join(missing_genes)}."
+        return jsonify(error=message.strip()), 404
+
+    # Build heatmap (palette follows selected scaling mode)
+    plt.close("all")
+    num_categories = len(expression_matrix.index)  # lesion groups on x
+    num_genes = len(expression_matrix.columns)  # genes on y
+    cell_size = 0.6
+    width_margin = 2.2  # allow space for labels + color bar
+    height_margin = 2.0
+    fig_width = max(5.0, num_categories * cell_size + width_margin)
+    fig_height = max(4.0, num_genes * cell_size + height_margin)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+    data_for_heatmap = expression_matrix.T
+    cmap_name = "YlOrRd" if scale_mode == "raw" else "coolwarm"
+    if sns is not None:
+        sns.set_style("white")
+        cmap = sns.color_palette(cmap_name, as_cmap=True)
+        sns.heatmap(
+            data_for_heatmap,
+            ax=ax,
+            cmap=cmap,
+            linewidths=0.4,
+            linecolor="white",
+            cbar_kws={"label": scale_label},
+            annot=True,
+            fmt=".1f",
+        )
+    else:
+        data = np.ma.masked_invalid(data_for_heatmap.to_numpy(dtype=float))
+        try:
+            cmap = plt.cm.get_cmap(cmap_name).copy()
+        except ValueError:
+            fallback = "coolwarm" if scale_mode == "zscore" else "magma_r"
+            cmap = plt.cm.get_cmap(fallback).copy()
+        cmap.set_bad(color="#f5f5f5")
+        im = ax.imshow(data, aspect="auto", cmap=cmap)
+        ax.set_xticks(np.arange(len(data_for_heatmap.columns)))
+        ax.set_xticklabels(
+            data_for_heatmap.columns, rotation=45, ha="right", fontsize=10
+        )
+        ax.set_yticks(np.arange(len(data_for_heatmap.index)))
+        ax.set_yticklabels(data_for_heatmap.index, fontsize=10)
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label(scale_label, fontsize=10)
+        valid_values = data_for_heatmap.to_numpy(dtype=float)
+        finite_values = valid_values[np.isfinite(valid_values)]
+        mean_value = finite_values.mean() if finite_values.size else 0
+        for i, row_label in enumerate(data_for_heatmap.index):
+            for j, gene_label in enumerate(data_for_heatmap.columns):
+                value = data_for_heatmap.iloc[i, j]
+                if pd.isna(value):
+                    continue
+                text_color = "#ffffff" if value >= mean_value else "#111111"
+                ax.text(
+                    j,
+                    i,
+                    f"{value:.1f}",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    color=text_color,
+                )
+
+    ax.set_xlabel("Lesion group", fontsize=11)
+    ax.set_ylabel("Gene", fontsize=11)
+    ax.set_title(scale_label, fontsize=12, pad=10)
+    ax.tick_params(axis="x", rotation=45, labelsize=9, labelright=False, labeltop=False)
+    ax.tick_params(axis="y", rotation=0, labelsize=10)
+    fig.tight_layout()
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", dpi=150, bbox_inches="tight", pad_inches=0.15)
+    buffer.seek(0)
+    plot_b64 = base64.b64encode(buffer.getvalue()).decode()
+    plt.close(fig)
+
+    response = {
+        "heatmap_url": f"data:image/png;base64,{plot_b64}",
+        "missing_genes": missing_genes,
+        "category_count": len(expression_matrix.index),
+        "scale_label": scale_label,
+        "group_stats": [
+            f"{label}: {group_stats.get(label, 0)} samples"
+            for label in category_order
+            if group_stats.get(label, 0)
+        ],
     }
     return jsonify(response)
 

@@ -234,35 +234,52 @@
             <summary>💡 How to Use</summary>
             <div class="how-to-panel">
                 <ol>
-                    <li><strong>Select Type:</strong> Choose Epithelium, Stroma, or Both to define the tissue compartment.</li>
+                    <li><strong>Select Type:</strong> Choose Epithelium, Stroma, or Both(Epithelium separated by groups with all stromal samples as comparison) to define the tissue compartment.</li>
+                    <li><strong>Choose Grouping Variable:</strong> Select Molecular subtype or Diagnosis to group lesion samples.</li>
                     <li><strong>Enter Gene List:</strong> Provide official gene symbols separated by commas (e.g., IGFBP2, KIFC1, MMP7, CD74).</li>
-                    <li><strong>Generate Plot:</strong> A heatmap preview will appear here in a future update.</li>
+                    <li><strong>Choose Scaling:</strong> Choose mean normalized counts for absolute expression or per-gene z-scores for relative highs and lows (color palette adjusts automatically).</li>
+                    <li><strong>Generate Plot:</strong> Preview the heatmap to see how expression varies across lesion groups.</li>
                 </ol>
-                <p class="how-to-note">
-                    This prototype focuses on layout and interaction. Plot generation will be wired up in the next iteration.
-                </p>
             </div>
         </details>
     </section>
 
     <section id="heatmapSection" class="hidden">
-        <form id="heatmapForm" onsubmit="return false;">
+        <form id="heatmapForm" onsubmit="generateHeatmap(); return false;">
             <div class="form-field">
                 <label for="heatmapType">Select Type:</label>
                 <select name="heatmapType" id="heatmapType">
                     <option value="epithelium">Epithelium</option>
-                    <option value="stroma">Stroma</option>
-                    <option value="both">Both Epithelium and Stroma</option>
+                    <option value="stroma" selected>Stroma</option>
+                    <option value="both">Both</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="heatmapCategory">Group By:</label>
+                <select name="heatmapCategory" id="heatmapCategory">
+                    <option value="molecular">Molecular subtype</option>
+                    <option value="diagnosis" selected>Diagnosis</option>
                 </select>
             </div>
             <div class="form-field gene-field">
                 <label for="heatmapGenes">Enter Gene List:</label>
-                <textarea id="heatmapGenes" name="heatmapGenes" rows="3" placeholder="SOX4, MMP7, CD74" style="min-width:240px; max-width:100%;"></textarea>
+                <textarea id="heatmapGenes" name="heatmapGenes" rows="3" placeholder="IGFBP2, KIFC1, MMP7"></textarea>
             </div>
-            <button type="button" class="form-submit" disabled title="Heatmap coming soon">Generate Heatmap</button>
+            <div class="form-field">
+                <label for="heatmapScale">Choose Scaling:</label>
+                <select id="heatmapScale" name="heatmapScale">
+                    <option value="raw" selected>Mean normalized count</option>
+                    <option value="zscore">Per-gene z-score</option>
+                </select>
+            </div>
+            <button type="submit" class="form-submit" id="generateHeatmapButton">
+                <span class="label">Generate Heatmap</span>
+                <span class="loading-spinner" aria-hidden="true"></span>
+            </button>
         </form>
+        <div id="heatmapError" class="form-error"></div>
         <div class="heatmap-placeholder hidden" id="heatmapPlaceholder">
-            Heatmap preview coming soon. You’ll be able to compare expression patterns across lesion groups here.
+            Enter a list of genes to preview the heatmap.
         </div>
     </section>
 
@@ -345,6 +362,9 @@
         const generateCorrelationButton = document.getElementById(
           "generateCorrelationButton"
         );
+        const heatmapForm = document.getElementById("heatmapForm");
+        const generateHeatmapButton = document.getElementById("generateHeatmapButton");
+        const heatmapError = document.getElementById("heatmapError");
         const heatmapPlaceholder = document.getElementById("heatmapPlaceholder");
 
         function setupGeneAutocomplete(inputElement, suggestionElement) {
@@ -988,6 +1008,72 @@
               generatePlotButton.classList.remove("is-loading");
             }
           });
+        }
+
+        function generateHeatmap() {
+          if (!heatmapForm) {
+            return false;
+          }
+          if (heatmapError) {
+            heatmapError.textContent = "";
+          }
+          const formData = new FormData(heatmapForm);
+          if (generateHeatmapButton) {
+            generateHeatmapButton.disabled = true;
+            generateHeatmapButton.classList.add("is-loading");
+          }
+          fetch("/pre_cancer_heatmap", {
+            method: "POST",
+            body: formData,
+          })
+            .then(res => {
+              if (!res.ok) {
+                return res.json().then(payload => {
+                  throw new Error(
+                    payload && payload.error ? payload.error : "Unable to generate heatmap."
+                  );
+                });
+              }
+              return res.json();
+            })
+            .then(data => {
+              const groupSummary = Array.isArray(data.group_stats) && data.group_stats.length
+                ? `<p class="heatmap-note">Group counts: ${data.group_stats.join("; ")}</p>`
+                : "";
+              const missing =
+                Array.isArray(data.missing_genes) && data.missing_genes.length
+                  ? `<p class="heatmap-note">Not in database: ${data.missing_genes.join(", ")}</p>`
+                  : "";
+              const scaleNote = data.scale_label
+                ? `<p class="heatmap-note">Scale: ${data.scale_label}</p>`
+                : "";
+              if (heatmapPlaceholder) {
+                heatmapPlaceholder.classList.remove("hidden");
+                if (data.heatmap_url) {
+                  heatmapPlaceholder.innerHTML = `
+                    <img src="${data.heatmap_url}" alt="RNA expression heatmap" class="heatmap-image">
+                    ${groupSummary}
+                    ${scaleNote}
+                    ${missing}
+                  `;
+                } else {
+                  heatmapPlaceholder.innerHTML = groupSummary || scaleNote || missing || "No heatmap image returned.";
+                }
+              }
+            })
+            .catch(err => {
+              if (heatmapError) {
+                heatmapError.textContent =
+                  err && err.message ? err.message : "Unable to generate heatmap.";
+              }
+            })
+            .finally(() => {
+              if (generateHeatmapButton) {
+                generateHeatmapButton.disabled = false;
+                generateHeatmapButton.classList.remove("is-loading");
+              }
+            });
+          return false;
         }
 
         // Mobile dropdown toggle for Gene Explore
