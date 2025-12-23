@@ -453,7 +453,15 @@
           }
 
           const normalize = value => (value || "").trim().toUpperCase();
-          let controller = null;
+          let allGenes = [];
+
+          // Load genes once
+          fetch("{{ url_for('static', filename='genes.json') }}")
+            .then(res => res.json())
+            .then(data => {
+              allGenes = data;
+            })
+            .catch(err => console.error("Failed to load gene list:", err));
 
           const clear = () => {
             suggestionElement.innerHTML = "";
@@ -485,44 +493,26 @@
           };
 
           const update = term => {
-            if (controller) {
-              controller.abort();
-              controller = null;
-            }
-
             if (!term || term.length < 1) {
               clear();
               return;
             }
 
-            const newController =
-              typeof AbortController !== "undefined" ? new AbortController() : null;
-            controller = newController;
-            const fetchOptions = newController ? { signal: newController.signal } : {};
-
-            fetch(`/genes?q=${encodeURIComponent(term)}`, fetchOptions)
-              .then(res => (res.ok ? res.json() : []))
-              .then(names => {
-                show(names);
-                controller = null;
-              })
-              .catch(err => {
-                if (!err || err.name !== "AbortError") {
-                  console.error("Gene suggestion lookup failed", err);
-                }
-                controller = null;
-                clear();
-              });
+            // Client-side search
+            const filtered = allGenes
+              .filter(g => g.startsWith(term))
+              .slice(0, 20);
+            
+            show(filtered);
           };
 
-          let debounceTimer;
           inputElement.addEventListener("input", event => {
             const value = normalize(event.target.value);
             if (event.target.value !== value) {
               event.target.value = value;
             }
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => update(value), 300);
+            // Instant update - no debounce needed for local search
+            update(value);
           });
 
           inputElement.addEventListener("focus", event => {

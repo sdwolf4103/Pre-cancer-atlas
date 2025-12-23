@@ -294,25 +294,7 @@ def _extract_gene_counts(gene: str) -> pd.DataFrame:
     return counts
 
 
-@lru_cache(maxsize=1)
-def _list_available_genes() -> list[str]:
-    try:
-        parquet_file = _get_count_parquet()
-    except Exception as exc:
-        logger.warning("Unable to open count parquet for gene list: %s", exc)
-        raise
 
-    genes: set[str] = set()
-    for row_group_idx in range(parquet_file.num_row_groups):
-        chunk = parquet_file.read_row_group(row_group_idx, columns=["Gene"]).column(
-            "Gene"
-        )
-        for entry in chunk.to_pylist():
-            if isinstance(entry, str):
-                normalized = entry.strip().upper()
-                if normalized:
-                    genes.add(normalized)
-    return sorted(genes)
 
 
 @lru_cache(maxsize=1)
@@ -383,22 +365,7 @@ def sitemap_xml():
     return send_from_directory(STATIC_DIR, "sitemap.xml", mimetype="application/xml")
 
 
-@app.route("/genes")
-@limiter.limit("60 per minute")
-def gene_suggestions():
-    query = (request.args.get("q") or "").strip().upper()
-    try:
-        genes = _list_available_genes()
-    except Exception as exc:
-        logger.warning("Gene lookup failed: %s", exc)
-        return jsonify([])
 
-    if query:
-        filtered = [g for g in genes if g.startswith(query)]
-    else:
-        filtered = genes
-
-    return jsonify(filtered[:20])
 
 
 @app.route("/pre_cancer_atlas", methods=["POST"])
