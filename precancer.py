@@ -9,6 +9,9 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -40,8 +43,34 @@ try:
     cloud_logger = logging.getLogger("usage_logger")
     cloud_logger.setLevel(logging.INFO)
     cloud_logger.addHandler(logging_handler)
+    cloud_logger.addHandler(logging_handler)
 except Exception:
     cloud_logger = None
+
+STATS_PASSWORD = os.getenv("STATS_PASSWORD")
+
+def check_auth(username, password):
+    """Check if a username/password combination is valid."""
+    return username == "shihlab" and password == STATS_PASSWORD
+
+def authenticate():
+    """Sends a 401 response that enables basic auth"""
+    return (
+        jsonify({"error": "This page requires proper authentication"}),
+        401,
+        {"WWW-Authenticate": 'Basic realm="Login Required"'},
+    )
+
+def requires_auth(f):
+    """Decorator to require HTTP Basic Auth."""
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
 
 def log_usage_event(event_type: str, details: dict):
     """Log a structured usage event to Cloud Logging."""
@@ -745,6 +774,7 @@ def correlation():
         sel_type = DEFAULT_CORRELATION_TYPE
 
     category_key = (request.form.get("category") or "").strip()
+    color_by_key = (request.form.get("color_by") or "").strip()
     detail_values = [
         value for value in request.form.getlist("category_detail") if value
     ]
@@ -839,7 +869,12 @@ def correlation():
             404,
         )
 
-    sample_frame = annotations[["Sample"]].drop_duplicates()
+    sample_cols = ["Sample"]
+    color_by_column = CATEGORY_COLUMN_MAP.get(color_by_key)
+    if color_by_column and color_by_column not in sample_cols:
+        sample_cols.append(color_by_column)
+
+    sample_frame = annotations[sample_cols].drop_duplicates()
     merged = sample_frame.merge(gene_a_counts, on="Sample", how="inner").merge(
         gene_b_counts, on="Sample", how="inner"
     )
@@ -875,15 +910,36 @@ def correlation():
         y_line = slope * x_line + intercept
 
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.scatter(
-        x,
-        y,
-        color="#1f3b70",
-        edgecolors="#ffffff",
-        linewidths=0.5,
-        alpha=0.75,
-        s=54,
-    )
+
+    if color_by_column and sns is not None:
+        # Use a pretty label for the legend
+        pretty_label = color_by_column.replace("_", " ")
+        if pretty_label != color_by_column:
+             merged = merged.rename(columns={color_by_column: pretty_label})
+             color_by_column = pretty_label
+        
+        sns.scatterplot(
+            data=merged,
+            x="gene_a_count",
+            y="gene_b_count",
+            hue=color_by_column,
+            alpha=0.75,
+            s=54,
+            edgecolor="#ffffff",
+            linewidth=0.5,
+            ax=ax,
+        )
+        sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+    else:
+        ax.scatter(
+            x,
+            y,
+            color="#1f3b70",
+            edgecolors="#ffffff",
+            linewidths=0.5,
+            alpha=0.75,
+            s=54,
+        )
     if x_line is not None and y_line is not None:
         ax.plot(x_line, y_line, color="#8b1a1a", linewidth=1.6)
 
@@ -1182,6 +1238,113 @@ def heatmap():
         ],
     }
     return jsonify(response)
+
+
+
+def _fetch_log_stats(days: int = 7) -> Dict:
+    """Query Cloud Logging for usage stats."""
+    if not logging_client:
+        return {"error": "Logging client not available"}
+
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        start_time = now - timedelta(days=days)
+        
+        filter_str = (
+            f'logName="projects/{logging_client.project}/logs/usage_logger" AND '
+            f'timestamp >= "{start_time.isoformat()}" AND '
+            'jsonPayload.event_type = ("PLOT_GENERATED" OR "CORRELATION_GENERATED" OR "VISIT")'
+        )
+
+        # Increase page size or loop for production, but 1000 is okay for now
+        entries = logging_client.list_entries(filter_=filter_str, page_size=2000)
+        
+        gene_counts: Dict[str, int] = {}
+        daily_visits: Dict[str, set] = {}  # date -> set of IPs
+        total_visits_count = 0
+
+        for entry in entries:
+            payload = entry.payload
+            if not isinstance(payload, dict):
+                continue
+                
+            event_type = payload.get("event_type")
+            timestamp = payload.get("timestamp")
+            ip = payload.get("ip_address")
+
+            if not timestamp:
+                continue
+
+            # Parse date YYYY-MM-DD
+            date_str = timestamp.split("T")[0]
+
+            if event_type == "VISIT":
+                total_visits_count += 1
+                if date_str not in daily_visits:
+                    daily_visits[date_str] = set()
+                daily_visits[date_str].add(ip)
+
+            elif event_type == "PLOT_GENERATED":
+                gene = payload.get("gene")
+                if gene:
+                    gene_counts[gene] = gene_counts.get(gene, 0) + 1
+            
+            elif event_type == "CORRELATION_GENERATED":
+                gene_a = payload.get("gene_a")
+                gene_b = payload.get("gene_b")
+                if gene_a:
+                    gene_counts[gene_a] = gene_counts.get(gene_a, 0) + 1
+                if gene_b:
+                    gene_counts[gene_b] = gene_counts.get(gene_b, 0) + 1
+
+        # Format for Chart.js
+        top_genes = sorted(gene_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        visit_stats = sorted(
+            [(date, len(ips)) for date, ips in daily_visits.items()], key=lambda x: x[0]
+        )
+        
+        # Summary Metrics
+        unique_visitors = sum(len(ips) for ips in daily_visits.values()) # Approximate over range
+        most_popular_gene = top_genes[0][0] if top_genes else "N/A"
+
+        return {
+            "top_genes": {
+                "labels": [g[0] for g in top_genes],
+                "data": [g[1] for g in top_genes],
+            },
+            "daily_visits": {
+                "labels": [v[0] for v in visit_stats],
+                "data": [v[1] for v in visit_stats],
+            },
+            "summary": {
+                "total_events": total_visits_count, # raw page loads
+                "unique_visitors": unique_visitors, # sum of daily uniques
+                "most_popular_gene": most_popular_gene
+            }
+        }
+
+    except Exception as e:
+        cloud_logger.error(f"Failed to fetch logs: {e}") if cloud_logger else None
+        return {"error": str(e)}
+
+
+@app.route("/stats")
+@requires_auth
+def stats_dashboard():
+    range_arg = request.args.get("range", "7d")
+    days_map = {"24h": 1, "7d": 7, "30d": 30}
+    days = days_map.get(range_arg, 7)
+
+    # Only fetch logs if we have credentials
+    try:
+        stats_data = _fetch_log_stats(days=days)
+    except Exception:
+        stats_data = {"error": "Could not connect to logging service."}
+    
+    stats_data["current_range"] = range_arg
+    return render_template("stats.html", stats=stats_data)
 
 
 if __name__ == "__main__":

@@ -538,6 +538,16 @@ form {
     margin-bottom: 20px;
 }
 
+/* Forces items onto a new line */
+.form-row {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+}
+
 .form-field {
     display: flex;
     align-items: center;
@@ -798,6 +808,18 @@ button[type="submit"]:hover { background-color: #50565c; }
     position: relative;
     display: inline-grid;
     place-items: center;
+}
+
+/* Plot Stats Formatting */
+.correlation-stats {
+    margin-top: 10px;
+    font-size: 0.95rem;
+    color: #444;
+}
+
+.stat-line {
+    display: block;
+    margin-bottom: 4px;
 }
 
 #generatePlotButton .label,

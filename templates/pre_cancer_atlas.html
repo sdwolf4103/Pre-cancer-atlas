@@ -203,6 +203,7 @@
                     <ol>
                         <li><strong>Select Category:</strong> Choose a grouping variable (e.g., Diagnosis, Morphology category, or Molecular subtype).</li>
                         <li><strong>Select Group(s):</strong> Choose one or multiple lesion groups to include in the correlation analysis.</li>
+                        <li><strong>Color By (Optional):</strong> Highlight points by Diagnosis or Molecular Subtype.</li>
                         <li><strong>Enter Gene A and Gene B:</strong> Input two official gene symbols (e.g., IGFBP2 and MMP7).</li>
                         <li><strong>Click “Generate Correlation”:</strong> A scatter plot will display gene expression correlation across the selected groups.</li>
                     </ol>
@@ -227,38 +228,50 @@
                 </details>
             </div>
 
-            <div class="form-field gene-input-line">
-                <label for="geneA">Enter Gene A:</label>
-                <div class="gene-input-wrapper">
-                    <input
-                        type="text"
-                        id="geneA"
-                        name="geneA"
-                        placeholder="Enter first gene"
-                        autocomplete="off"
-                        required>
-                    <div id="geneA-suggestions" class="gene-suggestions hidden"></div>
-                </div>
+            <div class="form-field">
+                <label for="colorBy">Color By:</label>
+                <select name="color_by" id="colorBy">
+                    <option value="" selected>None</option>
+                    <option value="diagnosis">Diagnosis</option>
+                    <option value="molecular">Molecular Subtype</option>
+                    <option value="morphology">Morphology Category</option>
+                </select>
             </div>
 
-            <div class="form-field gene-input-line">
-                <label for="geneB">Enter Gene B:</label>
-                <div class="gene-input-wrapper">
-                    <input
-                        type="text"
-                        id="geneB"
-                        name="geneB"
-                        placeholder="Enter second gene"
-                        autocomplete="off"
-                        required>
-                    <div id="geneB-suggestions" class="gene-suggestions hidden"></div>
+            <div class="form-row">
+                <div class="form-field gene-input-line">
+                    <label for="geneA">Enter Gene A:</label>
+                    <div class="gene-input-wrapper">
+                        <input
+                            type="text"
+                            id="geneA"
+                            name="geneA"
+                            placeholder="Enter first gene"
+                            autocomplete="off"
+                            required>
+                        <div id="geneA-suggestions" class="gene-suggestions hidden"></div>
+                    </div>
                 </div>
-            </div>
 
-            <button type="submit" class="form-submit" id="generateCorrelationButton">
-                <span class="label">Generate Correlation</span>
-                <span class="loading-spinner" aria-hidden="true"></span>
-            </button>
+                <div class="form-field gene-input-line">
+                    <label for="geneB">Enter Gene B:</label>
+                    <div class="gene-input-wrapper">
+                        <input
+                            type="text"
+                            id="geneB"
+                            name="geneB"
+                            placeholder="Enter second gene"
+                            autocomplete="off"
+                            required>
+                        <div id="geneB-suggestions" class="gene-suggestions hidden"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="form-submit" id="generateCorrelationButton">
+                    <span class="label">Generate Correlation</span>
+                    <span class="loading-spinner" aria-hidden="true"></span>
+                </button>
+            </div>
         </form>
 
         <div id="correlationResult" class="hidden">
@@ -927,6 +940,11 @@
           const categoryValue = categorySelect ? categorySelect.value : "";
           if (categoryValue) {
             formData.append("category", categoryValue);
+          }
+
+          const colorBySelect = document.getElementById("colorBy");
+          if (colorBySelect && colorBySelect.value) {
+            formData.append("color_by", colorBySelect.value);
           }
 
           const detailValues = getSelectedDetailValues();

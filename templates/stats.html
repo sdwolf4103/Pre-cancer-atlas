@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analytics Dashboard - Ovarian Pre-cancer Atlas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #1d3557;
+            --accent: #8a1e54;
+            --bg: #f7f9fc;
+            --card-bg: #fff;
+            --text: #333;
+        }
+        body { margin: 0; padding: 0; font-family: 'Lato', sans-serif; background-color: var(--bg); color: var(--text); }
+        .dashboard-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+        h1 { margin: 0; color: var(--primary); font-size: 1.8rem; }
+        
+        .time-filters { display: flex; gap: 8px; background: white; padding: 4px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .time-btn {
+            padding: 8px 16px; border: none; background: transparent; cursor: pointer; border-radius: 6px; font-weight: 600; color: #666; transition: all 0.2s;
+            text-decoration: none;
+        }
+        .time-btn:hover { background: #f0f0f0; }
+        .time-btn.active { background: var(--primary); color: white; }
+
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            display: flex; flex-direction: column;
+        }
+        .kpi-label { font-size: 0.9rem; color: #777; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi-value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+        
+        .charts-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 24px;
+        }
+        .chart-card {
+            background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); padding: 24px;
+        }
+        .chart-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); margin-bottom: 20px; }
+        .chart-container { position: relative; height: 320px; width: 100%; }
+        
+        .error-banner { background: #ffebee; color: #c62828; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffcdd2; }
+        .back-link { display: inline-block; margin-top: 24px; color: var(--primary); text-decoration: none; font-weight: 600; }
+
+        @media (max-width: 600px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .header { align-items: flex-start; flex-direction: column; }
+            .time-filters { width: 100%; justify-content: space-between; }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="header">
+            <h1>Analytics Dashboard</h1>
+            <div class="time-filters">
+                <a href="?range=24h" class="time-btn {% if stats.current_range == '24h' %}active{% endif %}">24 Hours</a>
+                <a href="?range=7d" class="time-btn {% if stats.current_range == '7d' %}active{% endif %}">7 Days</a>
+                <a href="?range=30d" class="time-btn {% if stats.current_range == '30d' %}active{% endif %}">1 Month</a>
+            </div>
+        </div>
+
+        {% if stats.error %}
+            <div class="error-banner">
+                <strong>Error fetching data:</strong> {{ stats.error }}
+                <p>Please check your Google Cloud credentials and permissions.</p>
+            </div>
+        {% else %}
+            <!-- Summary KPIs -->
+            <div class="summary-grid">
+                <div class="kpi-card">
+                    <span class="kpi-label">Unique Visitors</span>
+                    <span class="kpi-value">{{ stats.summary.unique_visitors }}</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Total Actions</span>
+                    <span class="kpi-value">{{ stats.summary.total_events }}</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Most Popular Gene</span>
+                    <span class="kpi-value">{{ stats.summary.most_popular_gene }}</span>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">Most Searched Genes</div>
+                    <div class="chart-container">
+                        <canvas id="genesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-title">Daily Visitor Traffic</div>
+                    <div class="chart-container">
+                        <canvas id="visitsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        
+        <a href="/" class="back-link">← Back to Atlas</a>
+    </div>
+
+    <script>
+        {% if not stats.error %}
+        const geneData = {{ stats.top_genes | tojson }};
+        const visitData = {{ stats.daily_visits | tojson }};
+        const range = "{{ stats.current_range }}";
+
+        Chart.defaults.font.family = "'Lato', sans-serif";
+        Chart.defaults.color = "#666";
+
+        // Top Genes Chart
+        new Chart(document.getElementById('genesChart'), {
+            type: 'bar',
+            data: {
+                labels: geneData.labels,
+                datasets: [{
+                    label: 'Search Count',
+                    data: geneData.data,
+                    backgroundColor: '#1d3557',
+                    borderRadius: 4,
+                    barPercentage: 0.6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { beginAtZero: true, grid: { borderDash: [4, 4] }, ticks: { precision: 0 } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // Daily Visits Chart
+        new Chart(document.getElementById('visitsChart'), {
+            type: 'line',
+            data: {
+                labels: visitData.labels,
+                datasets: [{
+                    label: 'Unique Visitors',
+                    data: visitData.data,
+                    borderColor: '#8a1e54',
+                    backgroundColor: 'rgba(138, 30, 84, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#8a1e54',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { beginAtZero: true, grid: { borderDash: [4, 4] }, ticks: { precision: 0 } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+        {% endif %}
+    </script>
+</body>
+</html>
