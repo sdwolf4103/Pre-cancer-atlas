@@ -50,7 +50,7 @@ try:
 except Exception:
     cloud_logger = None
 
-STATS_PASSWORD = os.getenv("STATS_PASSWORD")
+STATS_PASSWORD = os.getenv("STATS_PASSWORD", "sushi")
 
 def check_auth(username, password):
     """Check if a username/password combination is valid."""
