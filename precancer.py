@@ -1266,17 +1266,9 @@ def _fetch_log_stats(days: int = 7) -> Dict:
         gene_counts: Dict[str, int] = {}
         daily_visits: Dict[str, set] = {}  # date -> set of IPs
         total_visits_count = 0
-        debug_entries_count = 0
-        debug_sample_payloads = []
 
         for entry in entries:
-            debug_entries_count += 1
             payload = entry.payload
-            
-            # Capture first 5 payloads for debugging
-            if len(debug_sample_payloads) < 5:
-                debug_sample_payloads.append(str(payload)[:200])
-            
             if not isinstance(payload, dict):
                 continue
                 
@@ -1333,11 +1325,6 @@ def _fetch_log_stats(days: int = 7) -> Dict:
                 "total_events": total_visits_count, # raw page loads
                 "unique_visitors": unique_visitors, # sum of daily uniques
                 "most_popular_gene": most_popular_gene
-            },
-            "debug": {
-                "entries_found": debug_entries_count,
-                "filter_used": filter_str,
-                "sample_payloads": debug_sample_payloads
             }
         }
 
