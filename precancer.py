@@ -31,6 +31,31 @@ from werkzeug.exceptions import HTTPException
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+try:
+    import google.cloud.logging
+    from google.cloud.logging.handlers import CloudLoggingHandler
+    # Initialize logging client - lazy load to avoid errors if no creds
+    logging_client = google.cloud.logging.Client()
+    logging_handler = logging_client.get_default_handler()
+    cloud_logger = logging.getLogger("usage_logger")
+    cloud_logger.setLevel(logging.INFO)
+    cloud_logger.addHandler(logging_handler)
+except Exception:
+    cloud_logger = None
+
+def log_usage_event(event_type: str, details: dict):
+    """Log a structured usage event to Cloud Logging."""
+    payload = {
+        "event_type": event_type,
+        "timestamp": pd.Timestamp.now().isoformat(),
+        **details
+    }
+    if cloud_logger:
+        cloud_logger.info(json.dumps(payload))
+    else:
+        # Fallback to stdout for local dev
+        print(f"USAGE_LOG: {json.dumps(payload)}")
+
 HERE = Path(__file__).resolve().parent
 
 
@@ -372,6 +397,8 @@ def sitemap_xml():
 @limiter.limit("20 per minute")
 def plot():
     gene = request.form["gene"].strip().upper()
+    
+    log_usage_event("PLOT_GENERATED", {"gene": gene})
 
     # Load the count data for the specific gene
     try:
@@ -694,6 +721,9 @@ def plot():
 def correlation():
     gene_a = (request.form.get("geneA") or "").strip().upper()
     gene_b = (request.form.get("geneB") or "").strip().upper()
+    
+    log_usage_event("CORRELATION_GENERATED", {"gene_a": gene_a, "gene_b": gene_b})
+
     if not gene_a or not gene_b:
         return jsonify(error="Both Gene A and Gene B are required."), 400
 

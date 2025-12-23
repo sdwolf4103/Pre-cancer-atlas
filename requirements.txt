@@ -70,6 +70,8 @@ google-api-core==2.26.0
     # via google-api-python-client
 google-api-python-client==2.184.0
     # via pre-cacner-atlas (pyproject.toml)
+google-cloud-core
+google-cloud-logging
 google-auth==2.41.1
     # via
     #   pre-cacner-atlas (pyproject.toml)
