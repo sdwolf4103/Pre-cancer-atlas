@@ -412,3 +412,4 @@ werkzeug==3.1.3
     # via flask
 widgetsnbextension==4.0.14
     # via ipywidgets
+python-dotenv

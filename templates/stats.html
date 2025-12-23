@@ -88,6 +88,23 @@
                 <p>Please check your Google Cloud credentials and permissions.</p>
             </div>
         {% else %}
+            <!-- Debug Info Panel -->
+            {% if stats.debug %}
+            <div class="stats-card" style="background:#fffbe6; border: 1px solid #ffe58f; margin-bottom: 20px;">
+                <h3 style="color:#d48806; margin-bottom: 10px;">Debug Info</h3>
+                <p><strong>Entries found:</strong> {{ stats.debug.entries_found }}</p>
+                <p><strong>Filter used:</strong> <code style="font-size:0.8rem;">{{ stats.debug.filter_used }}</code></p>
+                {% if stats.debug.sample_payloads %}
+                <p><strong>Sample payloads:</strong></p>
+                <ul style="font-size:0.8rem; font-family:monospace;">
+                    {% for p in stats.debug.sample_payloads %}
+                    <li>{{ p }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endif %}
+
             <!-- Summary KPIs -->
             <div class="summary-grid">
                 <div class="kpi-card">
