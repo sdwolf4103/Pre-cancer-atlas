@@ -37,6 +37,8 @@ from werkzeug.exceptions import HTTPException
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+logging_client = None
+
 try:
     import google.cloud.logging
     from google.cloud.logging.handlers import CloudLoggingHandler
@@ -45,7 +47,6 @@ try:
     logging_handler = logging_client.get_default_handler()
     cloud_logger = logging.getLogger("usage_logger")
     cloud_logger.setLevel(logging.INFO)
-    cloud_logger.addHandler(logging_handler)
     cloud_logger.addHandler(logging_handler)
 except Exception:
     cloud_logger = None
@@ -97,8 +98,8 @@ def log_usage_event(event_type: str, details: dict):
     if cloud_logger:
         cloud_logger.info(json.dumps(payload))
     else:
-        # Fallback to stdout for local dev
-        print(f"USAGE_LOG: {json.dumps(payload)}")
+        # Fallback to pure JSON for Cloud Run structured logging
+        print(json.dumps(payload))
 
 HERE = Path(__file__).resolve().parent
 
@@ -1244,10 +1245,12 @@ def heatmap():
 
 
 
+
 def _fetch_log_stats(days: int = 7) -> Dict:
     """Query Cloud Logging for usage stats."""
     if not logging_client:
-        return {"error": "Logging client not available"}
+        # Try to re-init if it failed earlier (e.g. transient issue) but unlikely locally
+        return {"error": "Logging client not available (check credentials)"}
 
     try:
         from datetime import datetime, timedelta, timezone
@@ -1255,25 +1258,48 @@ def _fetch_log_stats(days: int = 7) -> Dict:
         now = datetime.now(timezone.utc)
         start_time = now - timedelta(days=days)
         
+        # Query both the structured logger AND stdout (where fallback logs go)
         filter_str = (
-            f'logName="projects/{logging_client.project}/logs/usage_logger" AND '
-            f'timestamp >= "{start_time.isoformat()}" AND '
-            'jsonPayload.event_type = ("PLOT_GENERATED" OR "CORRELATION_GENERATED" OR "VISIT")'
+            f'(logName="projects/{logging_client.project}/logs/usage_logger" OR '
+            f'logName="projects/{logging_client.project}/logs/run.googleapis.com%2Fstdout") AND '
+            f'timestamp >= "{start_time.isoformat()}"'
         )
 
-        # Increase page size or loop for production, but 1000 is okay for now
-        entries = logging_client.list_entries(filter_=filter_str, page_size=2000)
+        entries = logging_client.list_entries(filter_=filter_str, page_size=2000, order_by=google.cloud.logging.DESCENDING)
         
         gene_counts: Dict[str, int] = {}
-        daily_visits: Dict[str, set] = {}  # date -> set of IPs
+        daily_visits: Dict[str, set] = {}
         total_visits_count = 0
 
         for entry in entries:
-            payload = entry.payload
-            if not isinstance(payload, dict):
+            # logic to extract payload from either jsonPayload or textPayload
+            payload = None
+            if isinstance(entry.payload, dict):
+                payload = entry.payload
+            elif isinstance(entry.payload, str):
+                # Handle legacy text logs or raw stdout strings
+                text = entry.payload
+                if "USAGE_LOG:" in text:
+                    try:
+                        json_str = text.split("USAGE_LOG:", 1)[1]
+                        payload = json.loads(json_str)
+                    except ValueError:
+                        continue
+                else:
+                    try:
+                        # Try parsing direct JSON from stdout
+                        payload = json.loads(text)
+                    except ValueError:
+                        continue
+            
+            if not payload or not isinstance(payload, dict):
                 continue
                 
             event_type = payload.get("event_type")
+            # Ensure we only process our events
+            if event_type not in ("PLOT_GENERATED", "CORRELATION_GENERATED", "VISIT"):
+                continue
+
             timestamp = payload.get("timestamp")
             ip = payload.get("ip_address")
 
@@ -1281,7 +1307,10 @@ def _fetch_log_stats(days: int = 7) -> Dict:
                 continue
 
             # Parse date YYYY-MM-DD
-            date_str = timestamp.split("T")[0]
+            try:
+                date_str = timestamp.split("T")[0]
+            except Exception:
+                continue
 
             if event_type == "VISIT":
                 total_visits_count += 1
