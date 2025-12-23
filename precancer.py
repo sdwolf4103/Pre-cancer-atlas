@@ -45,9 +45,21 @@ except Exception:
 
 def log_usage_event(event_type: str, details: dict):
     """Log a structured usage event to Cloud Logging."""
+    # Capture visitor context
+    try:
+        # get_remote_address handles X-Forwarded-For if configured properly, 
+        # or we can use request.headers.get("X-Forwarded-For") directly for Cloud Run.
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        ua = request.user_agent.string
+    except Exception:
+        ip = "unknown"
+        ua = "unknown"
+
     payload = {
         "event_type": event_type,
         "timestamp": pd.Timestamp.now().isoformat(),
+        "ip_address": ip,
+        "user_agent": ua,
         **details
     }
     if cloud_logger:
@@ -377,6 +389,7 @@ def _prepare_annotation(sel_type: str | None) -> pd.DataFrame:
 
 @app.route("/")
 def home():
+    log_usage_event("VISIT", {})
     return render_template("pre_cancer_atlas.html")
 
 
