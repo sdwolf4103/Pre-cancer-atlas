@@ -54,6 +54,21 @@
             .header { align-items: flex-start; flex-direction: column; }
             .time-filters { width: 100%; justify-content: space-between; }
         }
+        @media (max-width: 600px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .header { align-items: flex-start; flex-direction: column; }
+            .time-filters { width: 100%; justify-content: space-between; }
+        }
+
+        /* Gene Table Styles */
+        .user-table-card {
+            background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); padding: 24px;
+        }
+        .gene-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .gene-table th, .gene-table td { text-align: left; padding: 12px 16px; border-bottom: 1px solid #eee; }
+        .gene-table th { font-weight: 700; color: var(--primary); background: #f9f9f9; }
+        .gene-table tr:last-child td { border-bottom: none; }
+        .gene-symbol { font-family: monospace; font-weight: 600; color: var(--accent); }
     </style>
 </head>
 <body>
@@ -103,6 +118,35 @@
                     <div class="chart-container">
                         <canvas id="visitsChart"></canvas>
                     </div>
+                </div>
+            </div>
+
+            <!-- Gene Count Table -->
+            <div class="stats-card user-table-card">
+                <h2>Total Gene Search Count</h2>
+                <div class="table-responsive">
+                    <table class="gene-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Gene Symbol</th>
+                                <th>Search Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for gene in stats.top_genes_list %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td class="gene-symbol">{{ gene[0] }}</td>
+                                <td>{{ gene[1] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="empty-cell">No data found in this period.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         {% endif %}

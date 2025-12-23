@@ -1314,6 +1314,7 @@ def _fetch_log_stats(days: int = 7) -> Dict:
                 "labels": [g[0] for g in top_genes],
                 "data": [g[1] for g in top_genes],
             },
+            "top_genes_list": top_genes, # For the table
             "daily_visits": {
                 "labels": [v[0] for v in visit_stats],
                 "data": [v[1] for v in visit_stats],
@@ -1327,6 +1328,25 @@ def _fetch_log_stats(days: int = 7) -> Dict:
 
     except Exception as e:
         cloud_logger.error(f"Failed to fetch logs: {e}") if cloud_logger else None
+        
+        # Mock data fallback for local development or error
+        if os.getenv("FLASK_ENV") != "production":
+             return {
+                "top_genes": {
+                    "labels": ["TP53", "BRCA1", "BRCA2", "MMP7", "KRAS"],
+                    "data": [120, 95, 80, 60, 45],
+                },
+                "top_genes_list": [("TP53", 120), ("BRCA1", 95), ("BRCA2", 80), ("MMP7", 60), ("KRAS", 45)],
+                "daily_visits": {
+                    "labels": ["2025-01-01", "2025-01-02", "2025-01-03", "2025-01-04"],
+                    "data": [40, 55, 30, 70],
+                },
+                 "summary": {
+                    "total_events": 350,
+                    "unique_visitors": 195,
+                    "most_popular_gene": "TP53"
+                }
+            }
         return {"error": str(e)}
 
 
