@@ -15,6 +15,8 @@ dependencies = [
   "gunicorn",
   "google-api-python-client",
   "google-auth",
+  "seaborn",
+  "Flask-Limiter",
 ]
 
 [tool.uv]
