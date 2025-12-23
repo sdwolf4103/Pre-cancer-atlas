@@ -1281,14 +1281,14 @@ def _fetch_log_stats(days: int = 7) -> Dict:
                 continue
                 
             event_type = payload.get("event_type")
-            timestamp = payload.get("timestamp")
             ip = payload.get("ip_address")
-
-            if not timestamp:
+            
+            # Use Cloud Logging entry's native timestamp (more reliable)
+            try:
+                date_str = entry.timestamp.strftime("%Y-%m-%d")
+            except Exception:
                 continue
 
-            # Parse date YYYY-MM-DD
-            date_str = timestamp.split("T")[0]
 
             if event_type == "VISIT":
                 total_visits_count += 1
