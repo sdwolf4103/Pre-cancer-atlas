@@ -15,6 +15,49 @@
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;600&family=Montserrat:wght@600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='index_styles.css') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/Logo_1_no_words.png') }}">
+    <style>
+        .citation-box {
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 10px 0;
+            border: 1px solid #e9ecef;
+            max-width: 100%;
+        }
+        .citation-box p {
+            margin: 0;
+            font-family: 'Lato', sans-serif; /* Match site font or keep monospace if preferred */
+            font-size: 0.9em;
+            color: #495057;
+            line-height: 1.4;
+            margin-right: 15px;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            padding: 5px;
+            cursor: pointer;
+            color: #6c757d;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .copy-btn:hover {
+            color: #007bff;
+            background-color: #e9ecef;
+        }
+        .copy-btn.copied {
+            color: #28a745;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
 
 </head>
 <body>
@@ -313,15 +356,52 @@
         <h2>How to Cite</h2>
         <p>
             The data used for generating the plots on this website are derived from analyses described in the manuscript
-            <strong><span class="citation-link"><em>Integrated Spatial Analysis of Ovarian Precancerous Lesions</em>, Chang et al.</span></strong>.
-            If you use these data for your own research or publication, please cite: [citation to be added].
+            <strong><a href="https://pubmed.ncbi.nlm.nih.gov/41411622/" class="citation-link" target="_blank" rel="noopener noreferrer"><em>Integrated Spatial Analysis Reveals the Molecular Landscape of Ovarian Precancerous Lesions</em>, Chang et al.</a></strong>.
         </p>
+        <div class="citation-box">
+            <p id="citationText">Chang, Tu-Yung et al. “Integrated Spatial Analysis Reveals the Molecular Landscape of Ovarian Precancerous Lesions.” Cancer research, 10.1158/0008-5472.CAN-25-3189. 18 Dec. 2025, doi:10.1158/0008-5472.CAN-25-3189</p>
+            <button class="copy-btn" onclick="copyCitation()" aria-label="Copy citation">
+                <svg class="icon-copy" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <svg class="icon-check hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </button>
+        </div>
         <p>
             If you use the Flat or BLAD morphology categories, please cite
             <strong><span class="citation-link"><em>Morphologic and Molecular Heterogeneity of High-grade Serous Carcinoma Precursor Lesions</em>, Chien et al.</span></strong>.
         </p>
     </section>
 </main>
+
+<script>
+    function copyCitation() {
+        // Get the text content, removing existing HTML tags logic if needed, but innerText is usually fine
+        const citationNode = document.getElementById("citationText");
+        const textToCopy = citationNode.innerText || citationNode.textContent;
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const btn = document.querySelector(".copy-btn");
+            const copyIcon = btn.querySelector(".icon-copy");
+            const checkIcon = btn.querySelector(".icon-check");
+
+            copyIcon.classList.add("hidden");
+            checkIcon.classList.remove("hidden");
+            btn.classList.add("copied");
+
+            setTimeout(() => {
+                copyIcon.classList.remove("hidden");
+                checkIcon.classList.add("hidden");
+                btn.classList.remove("copied");
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+        });
+    }
+</script>
 
     <footer class="site-disclaimer hidden" id="siteFooter">
         <p>All visualizations and analyses shown here are based on mRNA expression data generated using the NanoString GeoMx platform. These results are provided for research purposes only. All biological and clinical interpretations are not endorsed by the authors or affiliated institutions.</p>
