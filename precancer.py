@@ -28,6 +28,8 @@ from googleapiclient.http import MediaIoBaseDownload
 from scipy.stats import ttest_ind, pearsonr
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from werkzeug.exceptions import HTTPException
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 HERE = Path(__file__).resolve().parent
 
@@ -49,6 +51,17 @@ app = Flask(
     static_url_path="/static",
     template_folder=str(TEMPLATE_DIR),
 )
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per hour"],
+    storage_uri="memory://",
+)
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify(error="You have exceeded the request limit. Please try again later."), 429
 
 matplotlib.use("Agg")
 
@@ -371,6 +384,7 @@ def sitemap_xml():
 
 
 @app.route("/genes")
+@limiter.limit("60 per minute")
 def gene_suggestions():
     query = (request.args.get("q") or "").strip().upper()
     try:
@@ -388,6 +402,7 @@ def gene_suggestions():
 
 
 @app.route("/pre_cancer_atlas", methods=["POST"])
+@limiter.limit("20 per minute")
 def plot():
     gene = request.form["gene"].strip().upper()
 
@@ -708,6 +723,7 @@ def plot():
 
 
 @app.route("/pre_cancer_correlation", methods=["POST"])
+@limiter.limit("20 per minute")
 def correlation():
     gene_a = (request.form.get("geneA") or "").strip().upper()
     gene_b = (request.form.get("geneB") or "").strip().upper()

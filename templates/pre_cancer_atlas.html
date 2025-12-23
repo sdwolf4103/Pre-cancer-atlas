@@ -515,12 +515,14 @@
               });
           };
 
+          let debounceTimer;
           inputElement.addEventListener("input", event => {
             const value = normalize(event.target.value);
             if (event.target.value !== value) {
               event.target.value = value;
             }
-            update(value);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => update(value), 300);
           });
 
           inputElement.addEventListener("focus", event => {
