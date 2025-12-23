@@ -9,9 +9,12 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from typing import Dict, List, Optional
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, likely in production (use env vars)
 
 import matplotlib
 import matplotlib.pyplot as plt
